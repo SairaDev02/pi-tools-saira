@@ -7,6 +7,10 @@
  * formatting helpers — all pure functions, no pi runtime needed.
  */
 
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import {
 	badgeText,
 	currentState,
@@ -15,8 +19,10 @@ import {
 	formatTarget,
 	isPeakAt,
 	loadConfig,
+	loadPersistedMode,
 	loadProviderIds,
 	parseWindows,
+	savePersistedMode,
 	statusText,
 	type ScheduleConfig,
 } from "../src/deepseek-hours.ts";
@@ -257,6 +263,24 @@ console.log("\n== badgeText / statusText ==");
 	const inactive = statusText(st, cfg, UTC(2026, 7, 17, 2, 0), "anthropic", ["deepseek"]);
 	check("status (inactive) has provider note", inactive.includes("anthropic") && inactive.includes("indicator hidden"), inactive);
 }
+
+// --- 7. mode persistence -----------------------------------------------------
+console.log("\n== mode persistence ==");
+
+const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-mode-"));
+const stateFile = path.join(stateDir, "mode.json");
+check("loadPersistedMode: missing -> null", loadPersistedMode(stateFile) === null);
+savePersistedMode(stateFile, "full");
+check("loadPersistedMode: roundtrip full", loadPersistedMode(stateFile) === "full");
+savePersistedMode(stateFile, "off");
+check("loadPersistedMode: roundtrip off", loadPersistedMode(stateFile) === "off");
+savePersistedMode(stateFile, null);
+check("loadPersistedMode: cleared -> null", loadPersistedMode(stateFile) === null);
+await fs.writeFile(stateFile, JSON.stringify({ mode: "badge" }), "utf8");
+check("loadPersistedMode: badge", loadPersistedMode(stateFile) === "badge");
+await fs.writeFile(stateFile, JSON.stringify({ mode: "sometimes" }), "utf8");
+check("loadPersistedMode: invalid -> null", loadPersistedMode(stateFile) === null);
+await fs.rm(stateDir, { recursive: true, force: true });
 
 // -----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);

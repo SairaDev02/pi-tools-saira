@@ -25,11 +25,16 @@ The indicator appears in the footer **only while a DeepSeek model is the active 
 
 | Command | Effect |
 | --- | --- |
-| `/deepseek-hours` | Toggle the badge on/off |
+| `/deepseek-hours` | Toggle the badge on/off (persisted) |
 | `/deepseek-hours badge` | Colored status in the built-in footer (default) |
 | `/deepseek-hours full` | Replace the footer with a custom component: token usage, model, branch, other extension statuses, plus the DeepSeek window |
 | `/deepseek-hours off` | No indicator |
 | `/deepseek-hours status` | Print the current window state as plain text (e.g. for a quick check or to share with the model) |
+| `/deepseek-hours mode` | Show the current mode (`persisted` or `default`) |
+| `/deepseek-hours mode badge\|full\|off` | Set the mode **and persist it** across restarts |
+| `/deepseek-hours mode reset` | Back to the default (`badge`), clears persistence |
+
+The mode set via any command above is persisted to `~/.pi/agent/deepseek-hours/mode.json` and re-applied on the next session start (`/reload` included), so a `full`-footer preference survives restarts.
 
 ### What it shows
 
@@ -49,6 +54,7 @@ The official schedule is hardcoded by default; everything is overridable for sch
 | `DEEPSEEK_PEAK_WINDOWS` | Comma-separated `HH:MM-HH:MM` peak windows in the schedule timezone | `01:00-04:00,06:00-10:00` |
 | `DEEPSEEK_UTC_OFFSET` | Hours added to UTC for the schedule timezone (e.g. `8` for Beijing) | `0` (official schedule is UTC) |
 | `DEEPSEEK_PROVIDER_IDS` | Comma-separated provider ids to match | `deepseek` |
+| `DEEPSEEK_HOURS_STATE` | Mode state file (where `/deepseek-hours mode` persists) | `~/.pi/agent/deepseek-hours/mode.json` |
 
 Example (Beijing-time schedule):
 

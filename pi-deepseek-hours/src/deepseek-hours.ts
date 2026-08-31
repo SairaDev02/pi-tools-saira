@@ -10,7 +10,7 @@
  *    01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday
  *    (all other hours are off-peak)."
  *
- * Modes (toggle with /deepseek-hours):
+ * Modes (toggle with /deepseek-hours, persisted across restarts):
  *   badge  (default)  colored status item in the built-in footer
  *   full               replaces the footer with a custom component that also
  *                      shows token usage, model, branch and other extension
@@ -29,11 +29,15 @@
  *                          (default 0 — the official schedule is UTC)
  *   DEEPSEEK_PROVIDER_IDS  comma-separated provider ids to match
  *                          (default "deepseek")
+ *   DEEPSEEK_HOURS_STATE   mode state file (default ~/.pi/agent/deepseek-hours/mode.json;
+ *                          the mode set via /deepseek-hours survives restarts)
  *
  * The pure schedule/format logic lives in exported functions so the tests
  * (tests/deepseek-hours.test.ts) run with plain node, no pi runtime needed.
  */
 
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type {
@@ -294,6 +298,33 @@ const MIN_PAD = 2;
 
 type Mode = "badge" | "full" | "off";
 
+/** Agent dir (override with PI_CODING_AGENT_DIR), matching pi-provider-switch. */
+const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
+/** Mode state file (override with DEEPSEEK_HOURS_STATE for tests). */
+const MODE_STATE_FILE = process.env.DEEPSEEK_HOURS_STATE ?? join(AGENT_DIR, "deepseek-hours", "mode.json");
+
+/** Persisted mode from the state file; null means the default ("badge"). */
+export function loadPersistedMode(file: string): Mode | null {
+	try {
+		const parsed = JSON.parse(readFileSync(file, "utf8")) as { mode?: unknown };
+		return parsed.mode === "badge" || parsed.mode === "full" || parsed.mode === "off" ? parsed.mode : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Persist the footer mode; null clears it back to the default. */
+export function savePersistedMode(file: string, mode: Mode | null): void {
+	try {
+		mkdirSync(dirname(file), { recursive: true });
+		const tmp = `${file}.tmp`;
+		writeFileSync(tmp, JSON.stringify({ mode }, null, 2), "utf8");
+		renameSync(tmp, file);
+	} catch (err) {
+		console.warn(`[deepseek-hours] mode persist failed: ${(err as Error).message}`);
+	}
+}
+
 let cfg: ScheduleConfig;
 let providerIds: readonly string[];
 try {
@@ -311,7 +342,7 @@ function isDeepseek(provider: string | undefined): boolean {
 }
 
 export default function deepseekHoursExtension(pi: ExtensionAPI): void {
-	let mode: Mode = "badge";
+	let mode: Mode = loadPersistedMode(MODE_STATE_FILE) ?? "badge";
 	let currentCtx: ExtensionContext | undefined;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let lastBadge = ""; // only call setStatus when the text actually changes
@@ -520,43 +551,73 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 
 	// --- command ---------------------------------------------------------------
 
-	const MODE_ARGS = ["badge", "full", "off", "status"] as const;
+	const MODE_ARGS = ["badge", "full", "off", "status", "mode"] as const;
+	const MODE_SUBS = ["badge", "full", "off", "reset"] as const;
+
+	function notify(ctx: ExtensionCommandContext, msg: string, type: "info" | "warning" | "error" = "info"): void {
+		try {
+			ctx.ui.notify(msg, type);
+		} catch {
+			/* ignore */
+		}
+	}
 
 	pi.registerCommand("deepseek-hours", {
 		description:
-			"DeepSeek peak/off-peak footer indicator: /deepseek-hours [badge|full|off|status] (no arg toggles badge on/off)",
+			"DeepSeek peak/off-peak footer indicator: /deepseek-hours [badge|full|off|status] (no arg toggles badge on/off; /deepseek-hours mode [badge|full|off|reset] persists the mode)",
 		getArgumentCompletions: async (prefix: string) => {
 			const p = prefix.toLowerCase();
+			if (p.startsWith("mode")) {
+				const rest = p.slice(4).trim();
+				const candidates = rest === "" ? MODE_SUBS : MODE_SUBS.filter((s) => s.startsWith(rest));
+				const items = candidates.map((s) => ({ value: `mode ${s}`, label: `mode ${s}` }));
+				return items.length > 0 ? items : null;
+			}
 			return MODE_ARGS.filter((m) => m.startsWith(p)).map((m) => ({ value: m, label: m }));
 		},
 		handler: async (rawArgs, ctx) => {
 			currentCtx = ctx;
 			const arg = rawArgs.trim().toLowerCase();
+
+			// /deepseek-hours mode [badge|full|off|reset] — explicit, persisted.
+			if (arg === "mode" || arg.startsWith("mode ")) {
+				const sub = arg === "mode" ? "" : arg.slice(5).trim();
+				if (sub === "") {
+					const origin = loadPersistedMode(MODE_STATE_FILE) !== null ? "persisted" : "default";
+					notify(ctx, `DeepSeek hours mode: ${mode} (${origin})`, "info");
+					return;
+				}
+				if (sub === "badge" || sub === "full" || sub === "off") {
+					savePersistedMode(MODE_STATE_FILE, sub);
+					applyMode(sub, ctx, true);
+					return;
+				}
+				if (sub === "reset") {
+					savePersistedMode(MODE_STATE_FILE, null);
+					applyMode("badge", ctx, true);
+					return;
+				}
+				notify(ctx, `/deepseek-hours mode: unknown "${sub}" — use badge, full, off or reset`, "warning");
+				return;
+			}
+
 			if (arg === "") {
-				applyMode(mode === "off" ? "badge" : "off", ctx, true);
+				const next = mode === "off" ? "badge" : "off";
+				savePersistedMode(MODE_STATE_FILE, next);
+				applyMode(next, ctx, true);
 				return;
 			}
 			if (!MODE_ARGS.includes(arg as (typeof MODE_ARGS)[number])) {
-				try {
-					ctx.ui.notify(
-						`/deepseek-hours: unknown mode "${arg}" — use badge, full, off or status`,
-						"warning",
-					);
-				} catch {
-					/* ignore */
-				}
+				notify(ctx, `/deepseek-hours: unknown mode "${arg}" — use badge, full, off, mode or status`, "warning");
 				return;
 			}
 			if (arg === "status") {
 				const state = windowState(new Date());
 				const active = ctx.model?.provider;
-				try {
-					ctx.ui.notify(statusText(state, cfg, new Date(), active, providerIds), "info");
-				} catch {
-					/* ignore */
-				}
+				notify(ctx, statusText(state, cfg, new Date(), active, providerIds), "info");
 				return;
 			}
+			savePersistedMode(MODE_STATE_FILE, arg as Mode);
 			applyMode(arg as Mode, ctx, true);
 		},
 	});
@@ -565,6 +626,8 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", (_event, ctx) => {
 		currentCtx = ctx;
+		// Re-apply the persisted mode (e.g. full footer after a restart).
+		if (mode === "full") setFullFooter();
 		startTimer();
 		tick();
 	});

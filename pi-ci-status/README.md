@@ -32,11 +32,12 @@ If `gh` is missing or unauthenticated, the extension degrades to a silent no-op 
 
 - `/ci` — show the current status (badge + latest workflow)
 - `/ci refresh` — force a fresh check, bypassing the throttle
+- `/ci badge [on|off|activity|reset]` — set the footer badge mode at runtime (persisted); `reset` returns to the env var
 - The `ci_status` tool (`refresh: true` to bypass the throttle) is available to the model
 
-### Footer badge options (`CI_STATUS_BADGE`)
+### Footer badge options
 
-The footer badge can be gated or disabled via env var — the `ci_status` tool, `/ci` command, and context injection are **unaffected**:
+The footer badge can be gated or disabled via env var **and/or** the `/ci badge` runtime toggle (which wins and is persisted) — the `ci_status` tool, `/ci` command, and context injection are **unaffected**:
 
 | Value | Behavior |
 | --- | --- |
@@ -48,6 +49,18 @@ The footer badge can be gated or disabled via env var — the `ci_status` tool, 
 export CI_STATUS_BADGE=activity    # badge only appears once CI has run
 # or: export CI_STATUS_BADGE=off   # badge disabled, everything else keeps working
 ```
+
+At runtime (no restart needed):
+
+```text
+/ci badge              → show current mode (override or env default)
+/ci badge activity     → activity mode, persisted
+/ci badge on           → always show, persisted
+/ci badge off          → badge disabled, persisted
+/ci badge reset        → back to the CI_STATUS_BADGE env var
+```
+
+The override is stored in `~/.pi/agent/ci-status/badge-mode.json` (override the path with `CI_STATUS_BADGE_FILE`).
 
 ## Cost / behavior notes
 
@@ -70,7 +83,7 @@ CI_STATUS_GH_BIN=/nonexistent node --experimental-strip-types tests/ci-status.gh
 CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" GH_SHIM_AUTH_FAIL=1 node --experimental-strip-types tests/ci-status.ghfail.test.ts
 ```
 
-Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · gh-missing and unauthenticated no-ops. **48 assertions** across the 3 runs.
+Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops. **56 assertions** across the 3 runs.
 
 > The tests import the extension, so `typebox` (and `@earendil-works/pi-tui` if used) must be resolvable — e.g. run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
 

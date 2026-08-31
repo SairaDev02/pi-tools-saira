@@ -29,6 +29,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { execFile } from "node:child_process";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -288,6 +289,38 @@ export function shouldShowBadge(mode: BadgeMode, snapshot: CiSnapshot | null): b
   return true;
 }
 
+/** Badge-mode override persisted via `/ci badge`; null = follow CI_STATUS_BADGE. */
+export function loadBadgeOverride(file: string): BadgeMode | null {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { mode?: unknown };
+    return parsed.mode === "always" || parsed.mode === "activity" || parsed.mode === "off"
+      ? parsed.mode
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a badge-mode override; null clears it (back to the env var). */
+export function saveBadgeOverride(file: string, mode: BadgeMode | null): void {
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, JSON.stringify({ mode }, null, 2), "utf8");
+    renameSync(tmp, file);
+  } catch (err) {
+    console.error("[ci-status] badge-mode persist failed:", err);
+  }
+}
+
+/** Effective mode: the `/ci badge` override wins over the env var. */
+export function effectiveBadgeMode(
+  env: Record<string, string | undefined>,
+  override: BadgeMode | null,
+): BadgeMode {
+  return override ?? resolveBadgeMode(env);
+}
+
 // ---------------------------------------------------------------------------
 // Refresh (throttled)
 // ---------------------------------------------------------------------------
@@ -375,23 +408,25 @@ export async function refreshStatus(cwd: string, force = false): Promise<Refresh
 // ---------------------------------------------------------------------------
 
 const BADGE_KEY = "ci";
-/** Parsed once at load; invalid values fall back to "always". */
-const BADGE_MODE = resolveBadgeMode(process.env as Record<string, string | undefined>);
 
 export default function ciStatusExtension(pi: ExtensionAPI): void {
   let pendingInjectLine: string | null = null;
   let ghWarningShown = false;
+  /** /ci badge override (null = follow CI_STATUS_BADGE), persisted on change. */
+  const badgeFile = process.env.CI_STATUS_BADGE_FILE ?? path.join(os.homedir(), ".pi", "agent", "ci-status", "badge-mode.json");
+  let badgeOverride = loadBadgeOverride(badgeFile);
 
-  /** Set or clear the footer badge per CI_STATUS_BADGE mode. */
+  /** Set or clear the footer badge per the effective mode. */
   function syncBadge(
     ctx: { hasUI?: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } },
     snapshot: CiSnapshot | null,
   ): void {
     if (!ctx.hasUI) return;
+    const mode = effectiveBadgeMode(process.env as Record<string, string | undefined>, badgeOverride);
     try {
-      if (snapshot !== null && shouldShowBadge(BADGE_MODE, snapshot)) {
+      if (snapshot !== null && shouldShowBadge(mode, snapshot)) {
         ctx.ui.setStatus(BADGE_KEY, snapshot.badge);
-      } else if (BADGE_MODE !== "always") {
+      } else if (mode !== "always") {
         // activity/off: actively hide; always + no snapshot keeps any stale badge.
         ctx.ui.setStatus(BADGE_KEY, undefined);
       }
@@ -507,15 +542,52 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
   // --- command ---------------------------------------------------------------
 
   pi.registerCommand("ci", {
-    description: "Show CI status for the current branch (/ci refresh for a forced fresh check)",
+    description:
+      "Show CI status for the current branch (/ci refresh for a forced fresh check; /ci badge on|off|activity|reset to set the footer badge mode)",
     getArgumentCompletions: async (prefix) => {
-      const opts = ["refresh", "status"];
       const p = prefix.toLowerCase();
+      if (p.startsWith("badge")) {
+        const rest = p.slice(5).trim();
+        const subs = ["on", "off", "activity", "reset"];
+        const candidates = rest === "" ? subs : subs.filter((s) => s.startsWith(rest));
+        const items = candidates.map((s) => ({ value: `badge ${s}`, label: `badge ${s}` }));
+        return items.length > 0 ? items : null;
+      }
+      const opts = ["refresh", "status", "badge"];
       const out = opts.filter((o) => o.startsWith(p)).map((o) => ({ value: o, label: o }));
       return out.length > 0 ? out : null;
     },
     handler: async (args, ctx: ExtensionCommandContext) => {
       const arg = (args ?? "").trim().toLowerCase();
+
+      // /ci badge [on|off|activity|reset] — runtime badge-mode override.
+      if (arg === "badge" || arg.startsWith("badge ")) {
+        const sub = arg === "badge" ? "" : arg.slice("badge ".length).trim();
+        const current = effectiveBadgeMode(process.env as Record<string, string | undefined>, badgeOverride);
+        if (sub === "") {
+          const origin = badgeOverride !== null ? "override" : "env default";
+          ctx.ui.notify(`CI badge mode: ${current} (${origin})`, "info");
+          return;
+        }
+        let next: BadgeMode | null;
+        if (sub === "on") next = "always";
+        else if (sub === "off") next = "off";
+        else if (sub === "activity") next = "activity";
+        else if (sub === "reset") next = null;
+        else {
+          ctx.ui.notify(`/ci badge: unknown value "${sub}" — use on, off, activity or reset`, "warning");
+          return;
+        }
+        badgeOverride = next;
+        saveBadgeOverride(badgeFile, next);
+        // Fresh snapshot so the change is visible immediately (one gh spawn).
+        const { snapshot } = await refreshStatus(ctx.cwd, true);
+        syncBadge(ctx, snapshot);
+        const label = next === null ? "env default" : next === "always" ? "on" : next;
+        ctx.ui.notify(`CI badge mode: ${label} (persisted)`, "info");
+        return;
+      }
+
       const force = arg === "refresh" || arg === "-r";
       if (!(await ensureGh())) {
         ctx.ui.notify("ci-status: gh CLI missing or not authenticated", "error");
@@ -526,7 +598,7 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
         ctx.ui.notify("CI status unavailable (not a git repo?)", "info");
         return;
       }
-      if (ctx.hasUI) syncBadge(ctx, snapshot);
+      syncBadge(ctx, snapshot);
       ctx.ui.notify(
         snapshot.badge + " — " + (snapshot.latest ? snapshot.latest.workflowName : "no runs"),
         snapshot.failing.length > 0 ? "warning" : "info",

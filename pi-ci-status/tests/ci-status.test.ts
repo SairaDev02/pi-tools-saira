@@ -12,13 +12,16 @@ import {
   badgeText,
   currentBranch,
   deriveSnapshot,
+  effectiveBadgeMode,
   ensureGh,
   fetchRuns,
   flushState,
   formatStatus,
+  loadBadgeOverride,
   loadState,
   refreshStatus,
   resolveBadgeMode,
+  saveBadgeOverride,
   shouldShowBadge,
   stateFilePath,
   statusLine,
@@ -176,6 +179,23 @@ check("shouldShowBadge: off + snapshot", shouldShowBadge("off", r.snapshot) === 
 check("shouldShowBadge: activity + no runs", shouldShowBadge("activity", noRunSnap) === false);
 check("shouldShowBadge: activity + runs", shouldShowBadge("activity", r.snapshot) === true);
 check("shouldShowBadge: activity + null snapshot", shouldShowBadge("activity", null) === false);
+
+// --- 8. badge override persistence ------------------------------------------
+console.log("\n== badge override persistence ==");
+
+const badgeFile = path.join(tmpRoot, "badge-mode.json");
+check("loadBadgeOverride: missing file -> null", loadBadgeOverride(badgeFile) === null);
+saveBadgeOverride(badgeFile, "activity");
+check("loadBadgeOverride: roundtrip activity", loadBadgeOverride(badgeFile) === "activity");
+saveBadgeOverride(badgeFile, "off");
+check("loadBadgeOverride: roundtrip off", loadBadgeOverride(badgeFile) === "off");
+saveBadgeOverride(badgeFile, null);
+check("loadBadgeOverride: cleared -> null", loadBadgeOverride(badgeFile) === null);
+await fs.writeFile(badgeFile, JSON.stringify({ mode: "on" }), "utf8");
+check("loadBadgeOverride: invalid value -> null", loadBadgeOverride(badgeFile) === null);
+check("effectiveBadgeMode: no override -> env", effectiveBadgeMode({ CI_STATUS_BADGE: "activity" }, null) === "activity");
+check("effectiveBadgeMode: override wins over env", effectiveBadgeMode({ CI_STATUS_BADGE: "always" }, "activity") === "activity");
+check("effectiveBadgeMode: reset -> env default", effectiveBadgeMode({}, null) === "always");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await fs.rm(tmpRoot, { recursive: true, force: true });
