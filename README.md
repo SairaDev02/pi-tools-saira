@@ -1,6 +1,10 @@
 # pi-tools-saira
 
-A collection of custom extensions for the [Pi coding agent](https://pi.dev), packaged for distribution. Every package is a self-contained npm-style package (manifest + source + docs + license + tests) that Pi installs through its package mechanism.
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![For: Pi coding agent](https://img.shields.io/badge/For-Pi%20coding%20agent-8A2BE2)
+![Repo: SairaDev02/pi-tools-saira](https://img.shields.io/badge/Repo-SairaDev02%2Fpi--tools--saira-181717?logo=github&logoColor=white)
+
+A collection of custom extensions for the [Pi coding agent](https://pi.dev), packaged for distribution. Each package is self-contained (manifest + source + docs + license + tests) and installs through Pi's package mechanism — or by copying the single-file extension into Pi's global extensions dir.
 
 ## Packages
 
@@ -12,6 +16,8 @@ A collection of custom extensions for the [Pi coding agent](https://pi.dev), pac
 | [`pi-ci-status`](./pi-ci-status) | **CI status** — zero-token footer badge, on-demand `ci_status` tool, edge-triggered one-line context injection on CI state changes. Zero LLM calls. | `gh` (authenticated), `git` |
 
 ## Install
+
+### From npm (published packages)
 
 Each package is structured for npm publishing:
 
@@ -30,9 +36,13 @@ pi install npm:pi-ci-status
 
 > Check name availability on npm before publishing; if a name is taken, rename it in `package.json` (the `pi.extensions` entry points at `./src/<name>.ts` — keep the file name in sync).
 
-**No-publish alternative** — copy each single-file extension into Pi's global extensions dir (auto-discovered, hot-reloadable with `/reload`):
+### From this repo (no publish needed)
+
+The full source of every package lives in this repository. Clone it and copy each single-file extension into Pi's global extensions dir (auto-discovered, hot-reloadable with `/reload`):
 
 ```bash
+git clone https://github.com/SairaDev02/pi-tools-saira
+cd pi-tools-saira
 cp pi-nano-gpt-provider/src/nano-gpt-provider.ts ~/.pi/agent/extensions/
 cp pi-provider-switch/src/provider-switch.ts       ~/.pi/agent/extensions/
 cp pi-review-debt/src/review-debt.ts               ~/.pi/agent/extensions/
