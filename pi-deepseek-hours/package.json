@@ -1,0 +1,25 @@
+{
+  "name": "pi-deepseek-hours",
+  "version": "0.1.0",
+  "description": "DeepSeek peak/off-peak hours footer indicator for the Pi coding agent: colored badge (or full custom footer) showing the current billing window with a live countdown to the next transition, per DeepSeek's official pricing schedule.",
+  "type": "module",
+  "license": "MIT",
+  "author": "SairaDev02",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "deepseek",
+    "pricing",
+    "off-peak",
+    "footer"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": ["./src/deepseek-hours.ts"]
+  },
+  "files": ["src", "tests", "README.md", "LICENSE"]
+}

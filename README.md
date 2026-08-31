@@ -14,6 +14,7 @@ A collection of custom extensions for the [Pi coding agent](https://pi.dev), pac
 | [`pi-provider-switch`](./pi-provider-switch) | `/provider`, `/switch-provider`, `/models` — interactive and argument-based provider/model switching with tab-completions and optional persistence of the default. | — |
 | [`pi-review-debt`](./pi-review-debt) | **Review-debt tracker** — records review findings as durable per-repo debt, auto-flags likely-fixed findings via git blob change detection, surfaces open debt to the model and user. | `git` |
 | [`pi-ci-status`](./pi-ci-status) | **CI status** — zero-token footer badge, on-demand `ci_status` tool, edge-triggered one-line context injection on CI state changes. Zero LLM calls. | `gh` (authenticated), `git` |
+| [`pi-deepseek-hours`](./pi-deepseek-hours) | **DeepSeek peak/off-peak hours** — colored footer badge (or full custom footer) showing the current billing window with a live countdown to the next transition, per DeepSeek's official pricing schedule. | — |
 
 ## Install
 
@@ -32,6 +33,7 @@ pi install npm:pi-nano-gpt-provider
 pi install npm:pi-provider-switch
 pi install npm:pi-review-debt
 pi install npm:pi-ci-status
+pi install npm:pi-deepseek-hours
 ```
 
 > Check name availability on npm before publishing; if a name is taken, rename it in `package.json` (the `pi.extensions` entry points at `./src/<name>.ts` — keep the file name in sync).
@@ -47,6 +49,7 @@ cp pi-nano-gpt-provider/src/nano-gpt-provider.ts ~/.pi/agent/extensions/
 cp pi-provider-switch/src/provider-switch.ts       ~/.pi/agent/extensions/
 cp pi-review-debt/src/review-debt.ts               ~/.pi/agent/extensions/
 cp pi-ci-status/src/ci-status.ts                   ~/.pi/agent/extensions/
+cp pi-deepseek-hours/src/deepseek-hours.ts         ~/.pi/agent/extensions/
 ```
 
 After any install: `/reload` (or restart Pi).
@@ -67,6 +70,7 @@ gh auth login
 - Tests are self-contained (`node --experimental-strip-types`) — see each package README:
   - `pi-review-debt`: 19 assertions (record → detect → resolve loop on a real temp git repo)
   - `pi-ci-status`: 38 assertions across 3 runs (fake `gh` shim, no network)
+  - `pi-deepseek-hours`: 71 assertions (schedule parsing, weekday/weekend/offset transitions, formatting)
 
 ## License
 
