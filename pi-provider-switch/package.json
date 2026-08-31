@@ -1,0 +1,22 @@
+{
+  "name": "pi-provider-switch",
+  "version": "0.1.0",
+  "description": "Provider and model switching commands for the Pi coding agent: /provider, /switch-provider, /models with tab-completions and optional default persistence.",
+  "type": "module",
+  "license": "MIT",
+  "author": "SairaDev02",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "provider",
+    "models"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./src/provider-switch.ts"]
+  },
+  "files": ["src", "README.md", "LICENSE"]
+}

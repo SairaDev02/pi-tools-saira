@@ -1,0 +1,22 @@
+{
+  "name": "pi-nano-gpt-provider",
+  "version": "0.1.0",
+  "description": "nanoGPT custom provider extension for the Pi coding agent — lazy model discovery, per-model context windows, no startup blocking.",
+  "type": "module",
+  "license": "MIT",
+  "author": "SairaDev02",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "provider",
+    "nano-gpt"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./src/nano-gpt-provider.ts"]
+  },
+  "files": ["src", "README.md", "LICENSE"]
+}

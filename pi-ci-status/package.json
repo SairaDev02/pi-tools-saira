@@ -1,0 +1,24 @@
+{
+  "name": "pi-ci-status",
+  "version": "0.1.0",
+  "description": "Lightweight CI status for the Pi coding agent: zero-token footer badge, on-demand ci_status tool, and edge-triggered one-line context injection on CI state changes. Zero LLM calls.",
+  "type": "module",
+  "license": "MIT",
+  "author": "SairaDev02",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "ci",
+    "github-actions",
+    "gh"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": ["./src/ci-status.ts"]
+  },
+  "files": ["src", "tests", "README.md", "LICENSE"]
+}
