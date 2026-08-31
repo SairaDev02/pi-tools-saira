@@ -18,6 +18,8 @@ import {
   formatStatus,
   loadState,
   refreshStatus,
+  resolveBadgeMode,
+  shouldShowBadge,
   stateFilePath,
   statusLine,
 } from "../src/ci-status.ts";
@@ -159,6 +161,21 @@ console.log("\n== git/gh helpers ==");
 check("currentBranch = main", (await currentBranch(repo)) === "main");
 const fetched = await fetchRuns(repo, "main");
 check("fetchRuns parses 2 runs", fetched?.length === 2, String(fetched?.length));
+
+// --- 7. badge visibility modes ----------------------------------------------
+console.log("\n== badge visibility modes ==");
+
+check("resolveBadgeMode: default always", resolveBadgeMode({}) === "always");
+check("resolveBadgeMode: activity", resolveBadgeMode({ CI_STATUS_BADGE: "activity" }) === "activity");
+check("resolveBadgeMode: off (case-insensitive)", resolveBadgeMode({ CI_STATUS_BADGE: "OFF" }) === "off");
+check("resolveBadgeMode: invalid -> always", resolveBadgeMode({ CI_STATUS_BADGE: "sometimes" }) === "always");
+const noRunSnap = deriveSnapshot([]);
+check("shouldShowBadge: always + null snapshot", shouldShowBadge("always", null) === true);
+check("shouldShowBadge: always + snapshot", shouldShowBadge("always", r.snapshot) === true);
+check("shouldShowBadge: off + snapshot", shouldShowBadge("off", r.snapshot) === false);
+check("shouldShowBadge: activity + no runs", shouldShowBadge("activity", noRunSnap) === false);
+check("shouldShowBadge: activity + runs", shouldShowBadge("activity", r.snapshot) === true);
+check("shouldShowBadge: activity + null snapshot", shouldShowBadge("activity", null) === false);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await fs.rm(tmpRoot, { recursive: true, force: true });

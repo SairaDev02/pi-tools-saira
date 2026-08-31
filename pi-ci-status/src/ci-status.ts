@@ -265,6 +265,30 @@ export function formatStatus(snapshot: CiSnapshot, branch: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Badge visibility modes
+// ---------------------------------------------------------------------------
+
+/**
+ * Footer badge visibility, from `CI_STATUS_BADGE`:
+ *  - "always"   (default) show whenever a snapshot exists (current behavior)
+ *  - "activity" show only when the branch has CI activity (>= 1 run)
+ *  - "off"      never show the footer badge (tool, /ci, injection still work)
+ */
+export type BadgeMode = "always" | "activity" | "off";
+
+export function resolveBadgeMode(env: Record<string, string | undefined>): BadgeMode {
+  const v = env.CI_STATUS_BADGE?.trim().toLowerCase();
+  return v === "activity" || v === "off" || v === "always" ? v : "always";
+}
+
+/** Whether the footer badge should be shown for this mode/snapshot. */
+export function shouldShowBadge(mode: BadgeMode, snapshot: CiSnapshot | null): boolean {
+  if (mode === "off") return false;
+  if (mode === "activity") return snapshot !== null && snapshot.latest !== null;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Refresh (throttled)
 // ---------------------------------------------------------------------------
 
@@ -351,10 +375,30 @@ export async function refreshStatus(cwd: string, force = false): Promise<Refresh
 // ---------------------------------------------------------------------------
 
 const BADGE_KEY = "ci";
+/** Parsed once at load; invalid values fall back to "always". */
+const BADGE_MODE = resolveBadgeMode(process.env as Record<string, string | undefined>);
 
 export default function ciStatusExtension(pi: ExtensionAPI): void {
   let pendingInjectLine: string | null = null;
   let ghWarningShown = false;
+
+  /** Set or clear the footer badge per CI_STATUS_BADGE mode. */
+  function syncBadge(
+    ctx: { hasUI?: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } },
+    snapshot: CiSnapshot | null,
+  ): void {
+    if (!ctx.hasUI) return;
+    try {
+      if (snapshot !== null && shouldShowBadge(BADGE_MODE, snapshot)) {
+        ctx.ui.setStatus(BADGE_KEY, snapshot.badge);
+      } else if (BADGE_MODE !== "always") {
+        // activity/off: actively hide; always + no snapshot keeps any stale badge.
+        ctx.ui.setStatus(BADGE_KEY, undefined);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const warnGhMissing = (ctx: { hasUI?: boolean; ui: { notify: (m: string, t?: "info" | "warning" | "error") => void } }) => {
     if (ghWarningShown) return;
@@ -373,7 +417,7 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
         return;
       }
       const { snapshot } = await refreshStatus(ctx.cwd);
-      if (snapshot && ctx.hasUI) ctx.ui.setStatus(BADGE_KEY, snapshot.badge);
+      syncBadge(ctx, snapshot);
     } catch {
       // never break the loop
     }
@@ -388,8 +432,8 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
         return;
       }
       const { snapshot, branch, transition } = await refreshStatus(ctx.cwd);
+      syncBadge(ctx, snapshot);
       if (!snapshot || !branch) return;
-      if (ctx.hasUI) ctx.ui.setStatus(BADGE_KEY, snapshot.badge);
       if (transition) {
         const line = statusLine(snapshot, branch);
         pendingInjectLine = line;
@@ -482,7 +526,7 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
         ctx.ui.notify("CI status unavailable (not a git repo?)", "info");
         return;
       }
-      if (ctx.hasUI) ctx.ui.setStatus(BADGE_KEY, snapshot.badge);
+      if (ctx.hasUI) syncBadge(ctx, snapshot);
       ctx.ui.notify(
         snapshot.badge + " — " + (snapshot.latest ? snapshot.latest.workflowName : "no runs"),
         snapshot.failing.length > 0 ? "warning" : "info",

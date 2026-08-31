@@ -34,6 +34,21 @@ If `gh` is missing or unauthenticated, the extension degrades to a silent no-op 
 - `/ci refresh` — force a fresh check, bypassing the throttle
 - The `ci_status` tool (`refresh: true` to bypass the throttle) is available to the model
 
+### Footer badge options (`CI_STATUS_BADGE`)
+
+The footer badge can be gated or disabled via env var — the `ci_status` tool, `/ci` command, and context injection are **unaffected**:
+
+| Value | Behavior |
+| --- | --- |
+| `always` (default) | Show whenever a snapshot exists (current behavior) |
+| `activity` | Show only when the branch has CI activity (≥ 1 run); hides the "CI: –" placeholder on repos with no runs yet |
+| `off` | Never show the footer badge |
+
+```bash
+export CI_STATUS_BADGE=activity    # badge only appears once CI has run
+# or: export CI_STATUS_BADGE=off   # badge disabled, everything else keeps working
+```
+
 ## Cost / behavior notes
 
 - **Throttle**: at most one `gh run list` per **90 s** (`CI_STATUS_TTL_MS` env override) *and* per new HEAD — a run completing with no new commits still gets re-checked at the TTL; no redundant spawns otherwise.
@@ -55,9 +70,15 @@ CI_STATUS_GH_BIN=/nonexistent node --experimental-strip-types tests/ci-status.gh
 CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" GH_SHIM_AUTH_FAIL=1 node --experimental-strip-types tests/ci-status.ghfail.test.ts
 ```
 
-Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · gh-missing and unauthenticated no-ops. **38 assertions.**
+Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · gh-missing and unauthenticated no-ops. **48 assertions** across the 3 runs.
 
 > The tests import the extension, so `typebox` (and `@earendil-works/pi-tui` if used) must be resolvable — e.g. run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
+
+Type-check against the real Pi types (`tsconfig.json` included):
+
+```bash
+node_modules/.bin/tsc -p tsconfig.json
+```
 
 ## Requirements
 

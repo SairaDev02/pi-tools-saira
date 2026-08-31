@@ -69,7 +69,7 @@ gh auth login
 - Each package's `src/` file is the entire extension — no build step. Type-check against the real Pi types with `tsc --strict` (module NodeNext) using `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `@earendil-works/pi-tui`, and `typebox` from Pi's runtime.
 - Tests are self-contained (`node --experimental-strip-types`) — see each package README:
   - `pi-review-debt`: 19 assertions (record → detect → resolve loop on a real temp git repo)
-  - `pi-ci-status`: 38 assertions across 3 runs (fake `gh` shim, no network)
+  - `pi-ci-status`: 48 assertions across 3 runs (fake `gh` shim, no network)
   - `pi-deepseek-hours`: 71 assertions (schedule parsing, weekday/weekend/offset transitions, formatting)
 
 ## License
