@@ -26,7 +26,7 @@ Then `/reload` (or restart).
 gh auth login      # once
 ```
 
-If `gh` is missing or unauthenticated, the extension degrades to a silent no-op with a single warning — it never crashes or prompts.
+If `gh` is missing or unauthenticated, the extension shows a single warning and **recovers automatically**: it re-probes with capped backoff (default 5s → 5min) until gh is available again, and the `ci_status` tool and `/ci` force a fresh probe on demand. Failures are never latched — a transient at startup can't disable the badge for the whole session. It never crashes or prompts.
 
 ## Usage
 
@@ -65,7 +65,7 @@ The override is stored in `~/.pi/agent/ci-status/badge-mode.json` (override the 
 ## Cost / behavior notes
 
 - **Throttle**: at most one `gh run list` per **90 s** (`CI_STATUS_TTL_MS` env override) *and* per new HEAD — a run completing with no new commits still gets re-checked at the TTL; no redundant spawns otherwise.
-- **`gh` gate at load**: one-time `gh --version` + `gh auth status` probe. On failure, `gh` is never spawned again this session.
+- **`gh` gate**: `gh --version` + `gh auth status` probe, cached in a freshness window (default 60s, `CI_STATUS_GH_PROBE_TTL_MS`). On failure the extension retries with capped backoff (`CI_STATUS_GH_RETRY_BASE_MS` → `CI_STATUS_GH_RETRY_MAX_MS`, defaults 5s → 5min) until gh works again, and the `ci_status` tool / `/ci` re-probe on demand. **No permanent failure latch** — a transient at pi startup can't leave the badge disabled for the whole session.
 - **State**: `~/.pi/agent/ci-status/state.json` (override with `CI_STATUS_STATE`), keyed `repo|branch` → last fetch time, HEAD sha, snapshot, and inject key.
 - All I/O is error-swallowed — the extension can never break the agent loop.
 - It reports the **latest run** (status/conclusion + workflow name) and **which of the last 5 runs are failing**.
@@ -81,9 +81,12 @@ CI_STATUS_TTL_MS=1 CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" node --experimental
 # gh-missing / unauthenticated no-op (separate processes; the gh gate is cached per process)
 CI_STATUS_GH_BIN=/nonexistent node --experimental-strip-types tests/ci-status.ghfail.test.ts
 CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" GH_SHIM_AUTH_FAIL=1 node --experimental-strip-types tests/ci-status.ghfail.test.ts
+
+# recovery: a failed gate must NOT latch — forced re-probe recovers when gh is back
+CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" node --experimental-strip-types tests/recover.test.ts
 ```
 
-Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops. **56 assertions** across the 3 runs.
+Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops · gate-recovery after failure. **60 assertions** across the 4 runs.
 
 > The tests import the extension, so `typebox` (and `@earendil-works/pi-tui` if used) must be resolvable — e.g. run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
 

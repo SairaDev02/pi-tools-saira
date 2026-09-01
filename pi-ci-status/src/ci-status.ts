@@ -19,7 +19,8 @@
  * Cost discipline: this extension makes ZERO LLM calls. It only spawns
  * throttled `gh`/`git` processes: at most once per TTL (default 90s,
  * CI_STATUS_TTL_MS) AND once per new HEAD. If `gh` is missing or
- * unauthenticated, everything degrades to a silent no-op with one warning.
+ * unauthenticated at load, the extension no-ops with one warning and re-probes
+ * with capped backoff until gh is available again — failures are never latched.
  *
  * State: ~/.pi/agent/ci-status/state.json (override CI_STATUS_STATE for
  * tests). Test hooks: CI_STATUS_GH_BIN may point at a script (e.g. a .mjs
@@ -159,22 +160,104 @@ export async function runGh(args: string[], cwd: string): Promise<string | null>
   }
 }
 
-let ghGate: Promise<boolean> | null = null;
+// ---------------------------------------------------------------------------
+// gh availability gate — no permanent failure latch
+// ---------------------------------------------------------------------------
 
-/** One-time gate: gh present AND authenticated. Never spawns gh again after failure. */
-export function ensureGh(): Promise<boolean> {
-  if (ghGate) return ghGate;
-  ghGate = (async () => {
-    try {
-      const version = await runGh(["--version"], os.homedir());
-      if (!version) return false;
-      const auth = await runGh(["auth", "status"], os.homedir());
-      return auth !== null;
-    } catch {
-      return false;
-    }
-  })();
-  return ghGate;
+const GH_PROBE_TTL_MS = (() => {
+  const v = Number(process.env.CI_STATUS_GH_PROBE_TTL_MS);
+  return Number.isFinite(v) && v > 0 ? v : 60_000;
+})();
+
+const GH_PROBE_STALE_MS = (() => {
+  const v = Number(process.env.CI_STATUS_GH_PROBE_STALE_MS);
+  return Number.isFinite(v) && v > 0 ? v : 30_000;
+})();
+
+const GH_RETRY_BASE_MS = (() => {
+  const v = Number(process.env.CI_STATUS_GH_RETRY_BASE_MS);
+  return Number.isFinite(v) && v > 0 ? v : 5_000;
+})();
+
+const GH_RETRY_MAX_MS = (() => {
+  const v = Number(process.env.CI_STATUS_GH_RETRY_MAX_MS);
+  return Number.isFinite(v) && v > 0 ? v : 300_000;
+})();
+
+interface GhProbeState {
+  /** Last verdict; null until the first probe completes. */
+  ok: boolean | null;
+  /** When the last probe completed (epoch ms). */
+  probedAt: number;
+  /** Consecutive failures since the last success. */
+  retries: number;
+  /** Pending backoff re-probe. */
+  timer: ReturnType<typeof setTimeout> | null;
+  /** In-flight probe, shared so callers never spawn gh concurrently. */
+  inFlight: Promise<boolean> | null;
+}
+
+const ghProbe: GhProbeState = { ok: null, probedAt: 0, retries: 0, timer: null, inFlight: null };
+
+/** One probe: gh present AND authenticated. */
+export async function probeGh(): Promise<boolean> {
+  try {
+    const version = await runGh(["--version"], os.homedir());
+    if (!version) return false;
+    const auth = await runGh(["auth", "status"], os.homedir());
+    return auth !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Schedule a backoff re-probe; keeps going (capped) until gh works again. */
+function scheduleGhRetry(): void {
+  if (ghProbe.timer) return;
+  const delay = Math.min(GH_RETRY_BASE_MS * 2 ** Math.min(ghProbe.retries, 6), GH_RETRY_MAX_MS);
+  ghProbe.timer = setTimeout(() => {
+    ghProbe.timer = null;
+    void ensureGh(true);
+  }, delay);
+  // Never hold the process open (also keeps the ghfail tests from hanging).
+  ghProbe.timer.unref?.();
+}
+
+/**
+ * Current gh availability, cached within a freshness window.
+ *
+ * Unlike the old one-shot latch, a failure here is never final: a failed
+ * probe schedules a capped backoff re-probe, and any caller can force a
+ * fresh probe with `ensureGh(true)`. `refreshStatus` keeps the cheap cached
+ * path; the `ci_status` tool and `/ci` re-probe on demand when failing.
+ */
+export function ensureGh(force = false): Promise<boolean> {
+  const now = Date.now();
+  if (!force && ghProbe.ok !== null) {
+    const fresh = now - ghProbe.probedAt < (ghProbe.ok ? GH_PROBE_TTL_MS : GH_PROBE_STALE_MS);
+    if (fresh) return Promise.resolve(ghProbe.ok);
+  }
+  if (ghProbe.inFlight) return ghProbe.inFlight;
+  ghProbe.inFlight = probeGh()
+    .then((ok) => {
+      ghProbe.ok = ok;
+      ghProbe.probedAt = Date.now();
+      if (ok) {
+        ghProbe.retries = 0;
+        if (ghProbe.timer) {
+          clearTimeout(ghProbe.timer);
+          ghProbe.timer = null;
+        }
+      } else {
+        ghProbe.retries += 1;
+        scheduleGhRetry();
+      }
+      return ok;
+    })
+    .finally(() => {
+      ghProbe.inFlight = null;
+    });
+  return ghProbe.inFlight;
 }
 
 export async function repoRoot(cwd: string): Promise<string | null> {
@@ -412,6 +495,7 @@ const BADGE_KEY = "ci";
 export default function ciStatusExtension(pi: ExtensionAPI): void {
   let pendingInjectLine: string | null = null;
   let ghWarningShown = false;
+  let ghRecoveredNotified = false;
   /** /ci badge override (null = follow CI_STATUS_BADGE), persisted on change. */
   const badgeFile = process.env.CI_STATUS_BADGE_FILE ?? path.join(os.homedir(), ".pi", "agent", "ci-status", "badge-mode.json");
   let badgeOverride = loadBadgeOverride(badgeFile);
@@ -441,16 +525,29 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
     if (ctx.hasUI) ctx.ui.notify("ci-status: gh CLI missing or not authenticated — CI badge disabled", "warning");
   };
 
+  /**
+   * Gate for the session handlers: warn once while gh is unavailable, then
+   * notify once when it recovers (the badge comes back without a pi restart).
+   */
+  const ghAvailable = async (ctx: { hasUI?: boolean; ui: { notify: (m: string, t?: "info" | "warning" | "error") => void } }): Promise<boolean> => {
+    if (!(await ensureGh())) {
+      warnGhMissing(ctx);
+      return false;
+    }
+    if (ghWarningShown && !ghRecoveredNotified && ctx.hasUI) {
+      ghRecoveredNotified = true;
+      ctx.ui.notify("ci-status: gh available again — CI badge enabled", "info");
+    }
+    return true;
+  };
+
   // Probe gh once at load; remember the verdict for the session.
   void ensureGh();
 
   // Initial badge + baseline inject key (no notification on first sight).
   pi.on("session_start", async (_event, ctx) => {
     try {
-      if (!(await ensureGh())) {
-        warnGhMissing(ctx);
-        return;
-      }
+      if (!(await ghAvailable(ctx))) return;
       const { snapshot } = await refreshStatus(ctx.cwd);
       syncBadge(ctx, snapshot);
     } catch {
@@ -462,10 +559,7 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
   // and queue the one-line delta for the next turn's system prompt.
   pi.on("agent_end", async (_event, ctx) => {
     try {
-      if (!(await ensureGh())) {
-        warnGhMissing(ctx);
-        return;
-      }
+      if (!(await ghAvailable(ctx))) return;
       const { snapshot, branch, transition } = await refreshStatus(ctx.cwd);
       syncBadge(ctx, snapshot);
       if (!snapshot || !branch) return;
@@ -515,7 +609,10 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
       ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (!(await ensureGh())) {
+      // On-demand recovery: re-probe when the cached verdict is failing, so a
+      // transient at load never leaves the tool dead for the whole session.
+      const ok = (await ensureGh()) || (await ensureGh(true));
+      if (!ok) {
         return {
           content: [
             { type: "text", text: "CI status unavailable: gh CLI is not installed or not authenticated." },
@@ -589,7 +686,8 @@ export default function ciStatusExtension(pi: ExtensionAPI): void {
       }
 
       const force = arg === "refresh" || arg === "-r";
-      if (!(await ensureGh())) {
+      const ok = (await ensureGh()) || (await ensureGh(true));
+      if (!ok) {
         ctx.ui.notify("ci-status: gh CLI missing or not authenticated", "error");
         return;
       }
