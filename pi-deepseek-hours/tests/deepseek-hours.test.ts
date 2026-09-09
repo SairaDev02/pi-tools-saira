@@ -14,16 +14,20 @@ import path from "node:path";
 import {
 	badgeText,
 	currentState,
+	flashRatesText,
 	formatCountdown,
 	formatNow,
 	formatTarget,
 	isPeakAt,
 	loadConfig,
+	loadFlashRates,
 	loadPersistedMode,
 	loadProviderIds,
+	parseFlashRates,
 	parseWindows,
 	savePersistedMode,
 	statusText,
+	type FlashRates,
 	type ScheduleConfig,
 } from "../src/deepseek-hours.ts";
 
@@ -264,7 +268,68 @@ console.log("\n== badgeText / statusText ==");
 	check("status (inactive) has provider note", inactive.includes("anthropic") && inactive.includes("indicator hidden"), inactive);
 }
 
-// --- 7. mode persistence -----------------------------------------------------
+// --- 7. Flash-series rate card ---------------------------------------------
+console.log("\n== flash rate card ==");
+
+const FLASH_DEFAULTS: FlashRates = { cacheHit: 0.003, cacheMiss: 0.15, output: 0.6 };
+
+{
+	const r = parseFlashRates("0.003,0.15,0.6");
+	check("parse default rates", r.cacheHit === 0.003 && r.cacheMiss === 0.15 && r.output === 0.6, JSON.stringify(r));
+	check("loadFlashRates: missing -> defaults", JSON.stringify(loadFlashRates({})) === JSON.stringify(FLASH_DEFAULTS));
+	check("loadFlashRates: empty -> defaults", JSON.stringify(loadFlashRates({ DEEPSEEK_FLASH_RATES: "  " })) === JSON.stringify(FLASH_DEFAULTS));
+	check("loadFlashRates: override", JSON.stringify(loadFlashRates({ DEEPSEEK_FLASH_RATES: "0.007,0.22,0.66" })) === JSON.stringify({ cacheHit: 0.007, cacheMiss: 0.22, output: 0.66 }));
+}
+
+{
+	let threw = false;
+	try {
+		parseFlashRates("0.003,0.15");
+	} catch {
+		threw = true;
+	}
+	check("malformed rates (2 values) throw", threw);
+	threw = false;
+	try {
+		parseFlashRates("a,b,c");
+	} catch {
+		threw = true;
+	}
+	check("malformed rates (non-numeric) throw", threw);
+	threw = false;
+	try {
+		parseFlashRates("");
+	} catch {
+		threw = true;
+	}
+	check("empty rates string throws", threw);
+	threw = false;
+	try {
+		loadFlashRates({ DEEPSEEK_FLASH_RATES: "a,b,c" });
+	} catch {
+		threw = true;
+	}
+	check("loadFlashRates: invalid -> throws", threw);
+}
+
+{
+	const r = parseFlashRates("0.003,0.15,0.6");
+	const text = flashRatesText(r);
+	check("rates text shows off-peak prices", text.includes("off-peak $0.003 / $0.15 / $0.6"), text);
+	check("rates text derives peak as 2x off-peak", text.includes("peak $0.006 / $0.3 / $1.2"), text);
+}
+
+{
+	const st = currentState(cfg, UTC(2026, 7, 17, 2, 0)); // Mon 02:00 UTC — peak
+	const rates = parseFlashRates("0.003,0.15,0.6");
+	const active = statusText(st, cfg, UTC(2026, 7, 17, 2, 0), "deepseek", ["deepseek"], rates);
+	check("status (active) includes rate card", active.includes("Flash (per 1M tokens)"), active);
+	check("status (active) shows an off-peak price", active.includes("$0.15"), active);
+	const plain = statusText(st, cfg, UTC(2026, 7, 17, 2, 0), "deepseek", ["deepseek"]);
+	check("status without rates is unchanged", !plain.includes("Flash (per 1M tokens)"), plain);
+}
+
+// --- 8. mode persistence -----------------------------------------------------
 console.log("\n== mode persistence ==");
 
 const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-mode-"));

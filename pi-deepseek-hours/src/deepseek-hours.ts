@@ -10,6 +10,12 @@
  *    01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday
  *    (all other hours are off-peak)."
  *
+ *   Rate card (Flash series) — effective 2026-09-10 12:00 Beijing time:
+ *   off-peak unit prices are $0.003 per 1M input tokens on cache hits,
+ *   $0.15 per 1M input tokens on cache misses and $0.6 per 1M output
+ *   tokens; peak-hour prices are double the off-peak rates. The
+ *   peak/off-peak windows above are unchanged.
+ *
  * Modes (toggle with /deepseek-hours, persisted across restarts):
  *   badge  (default)  colored status item in the built-in footer
  *   full               replaces the footer with a custom component that also
@@ -29,6 +35,10 @@
  *                          (default 0 — the official schedule is UTC)
  *   DEEPSEEK_PROVIDER_IDS  comma-separated provider ids to match
  *                          (default "deepseek")
+ *   DEEPSEEK_FLASH_RATES   off-peak Flash unit prices "hit,miss,output" in
+ *                          USD per 1M tokens (default "0.003,0.15,0.6" —
+ *                          the rate card effective 2026-09-10 12:00 Beijing;
+ *                          peak prices are derived as 2x off-peak)
  *   DEEPSEEK_HOURS_STATE   mode state file (default ~/.pi/agent/deepseek-hours/mode.json;
  *                          the mode set via /deepseek-hours survives restarts)
  *
@@ -58,6 +68,8 @@ export const DEFAULT_PEAK_WINDOWS_STR = "01:00-04:00,06:00-10:00";
 /** JS Date.getDay() values that count as peak weekdays (1=Mon .. 5=Fri). */
 export const DEFAULT_PEAK_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5];
 export const DEFAULT_PROVIDER_IDS: readonly string[] = ["deepseek"];
+/** Off-peak Flash unit prices (USD per 1M tokens) as "hit,miss,output", effective 2026-09-10 12:00 Beijing. */
+export const DEFAULT_FLASH_RATES_STR = "0.003,0.15,0.6";
 
 export interface PeakWindow {
 	/** Start of the window: minutes since midnight (schedule tz), inclusive. */
@@ -122,6 +134,40 @@ export function loadProviderIds(env: Record<string, string | undefined>): readon
 		.split(",")
 		.map((p) => p.trim())
 		.filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// Flash-series rate card (env-overridable, pure)
+// ---------------------------------------------------------------------------
+
+/** Off-peak unit prices for the Flash series, USD per 1M tokens. */
+export interface FlashRates {
+	/** Input, prompt cache hit. */
+	cacheHit: number;
+	/** Input, prompt cache miss. */
+	cacheMiss: number;
+	/** Output. */
+	output: number;
+}
+
+/** Parse "hit,miss,output" (USD/1M, off-peak). Throws on invalid input. */
+export function parseFlashRates(s: string): FlashRates {
+	const parts = s.split(",").map((p) => p.trim()).filter(Boolean);
+	if (parts.length !== 3) {
+		throw new Error(`DEEPSEEK_FLASH_RATES must be "hit,miss,output" (got "${s}")`);
+	}
+	const nums = parts.map(Number);
+	if (!nums.every((n) => Number.isFinite(n) && n >= 0)) {
+		throw new Error(`Invalid DEEPSEEK_FLASH_RATES "${s}" (expected non-negative numbers)`);
+	}
+	return { cacheHit: nums[0], cacheMiss: nums[1], output: nums[2] };
+}
+
+/** Load the rate card from env; missing/empty falls back to the defaults. */
+export function loadFlashRates(env: Record<string, string | undefined>): FlashRates {
+	const raw = env.DEEPSEEK_FLASH_RATES?.trim();
+	if (raw === undefined || raw === "") return parseFlashRates(DEFAULT_FLASH_RATES_STR);
+	return parseFlashRates(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +311,20 @@ export function badgeText(state: WindowState, cfg: ScheduleConfig, now: Date): s
 	return `DSK off-peak (-50%) · next peak ${target} in ${countdown}`;
 }
 
+/** "$0.003" — keep only the decimals the value actually needs (3 for sub-cent rates). */
+function formatUsd(n: number): string {
+	return `$${n.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}`;
+}
+
+/**
+ * Rate-card line shown by /deepseek-hours status: off-peak Flash unit prices
+ * (USD per 1M tokens) with peak prices derived as 2x off-peak, e.g.
+ * "Flash (per 1M tokens): off-peak $0.003 / $0.15 / $0.6 · peak $0.006 / $0.3 / $1.2".
+ */
+export function flashRatesText(r: FlashRates): string {
+	return `Flash (per 1M tokens): off-peak ${formatUsd(r.cacheHit)} / ${formatUsd(r.cacheMiss)} / ${formatUsd(r.output)} · peak ${formatUsd(r.cacheHit * 2)} / ${formatUsd(r.cacheMiss * 2)} / ${formatUsd(r.output * 2)}`;
+}
+
 /** One-line human-readable status for the /deepseek-hours status command. */
 export function statusText(
 	state: WindowState,
@@ -272,6 +332,7 @@ export function statusText(
 	now: Date,
 	activeProvider: string | undefined,
 	providerIds: readonly string[],
+	rates?: FlashRates,
 ): string {
 	const nowTz = new Date(now.getTime() + cfg.utcOffsetMinutes * 60_000);
 	const target = formatTarget(cfg, state.nextTransitionTz, nowTz);
@@ -279,13 +340,14 @@ export function statusText(
 	const stateStr = state.peak
 		? "PEAK (2× off-peak rate)"
 		: "OFF-PEAK (-50% off)";
-	const base = `DeepSeek ${stateStr} · next ${state.nextIsPeak ? "peak" : "off-peak"} ${target} in ${countdown} · now ${formatNow(cfg, nowTz)}`;
-	if (activeProvider !== undefined && providerIds.includes(activeProvider)) return base;
+	let text = `DeepSeek ${stateStr} · next ${state.nextIsPeak ? "peak" : "off-peak"} ${target} in ${countdown} · now ${formatNow(cfg, nowTz)}`;
+	if (rates) text += ` · ${flashRatesText(rates)}`;
+	if (activeProvider !== undefined && providerIds.includes(activeProvider)) return text;
 	const note =
 		activeProvider === undefined
 			? `current provider: none — indicator hidden`
 			: `current provider: ${activeProvider} (not ${providerIds.join("/")}) — indicator hidden`;
-	return `${base} · ${note}`;
+	return `${text} · ${note}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,14 +389,17 @@ export function savePersistedMode(file: string, mode: Mode | null): void {
 
 let cfg: ScheduleConfig;
 let providerIds: readonly string[];
+let flashRates: FlashRates;
 try {
 	cfg = loadConfig(process.env as Record<string, string | undefined>);
 	providerIds = loadProviderIds(process.env as Record<string, string | undefined>);
+	flashRates = loadFlashRates(process.env as Record<string, string | undefined>);
 } catch (err) {
 	// Never break the extension loader on bad env vars — fall back to defaults.
 	console.warn(`[deepseek-hours] invalid config, using defaults: ${(err as Error).message}`);
 	cfg = { windows: parseWindows(DEFAULT_PEAK_WINDOWS_STR), utcOffsetMinutes: 0, peakWeekdays: DEFAULT_PEAK_WEEKDAYS };
 	providerIds = DEFAULT_PROVIDER_IDS;
+	flashRates = parseFlashRates(DEFAULT_FLASH_RATES_STR);
 }
 
 function isDeepseek(provider: string | undefined): boolean {
@@ -614,7 +679,7 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 			if (arg === "status") {
 				const state = windowState(new Date());
 				const active = ctx.model?.provider;
-				notify(ctx, statusText(state, cfg, new Date(), active, providerIds), "info");
+				notify(ctx, statusText(state, cfg, new Date(), active, providerIds, flashRates), "info");
 				return;
 			}
 			savePersistedMode(MODE_STATE_FILE, arg as Mode);

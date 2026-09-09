@@ -6,6 +6,8 @@ Shows whether DeepSeek API usage is currently billed at the **peak** rate or the
 
 > *"Off-peak rates are half of the peak rates. **Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday** (all other hours are off-peak)."*
 > — <https://api-docs.deepseek.com/quick_start/pricing>
+>
+> **Rate card (Flash series)** — effective **12:00 Beijing time, 2026-09-10**, off-peak unit prices are **$0.003 / 1M input tokens (cache hits)**, **$0.15 / 1M input tokens (cache misses)** and **$0.6 / 1M output tokens**; **peak-hour prices are double** the off-peak rates. The peak/off-peak schedule above is unchanged.
 
 ## Install
 
@@ -29,7 +31,7 @@ The indicator appears in the footer **only while a DeepSeek model is the active 
 | `/deepseek-hours badge` | Colored status in the built-in footer (default) |
 | `/deepseek-hours full` | Replace the footer with a custom component: token usage, model, branch, other extension statuses, plus the DeepSeek window |
 | `/deepseek-hours off` | No indicator |
-| `/deepseek-hours status` | Print the current window state as plain text (e.g. for a quick check or to share with the model) |
+| `/deepseek-hours status` | Print the current window state as plain text, plus the Flash rate card (e.g. for a quick check or to share with the model) |
 | `/deepseek-hours mode` | Show the current mode (`persisted` or `default`) |
 | `/deepseek-hours mode badge\|full\|off` | Set the mode **and persist it** across restarts |
 | `/deepseek-hours mode reset` | Back to the default (`badge`), clears persistence |
@@ -41,6 +43,12 @@ The mode set via any command above is persisted to `~/.pi/agent/deepseek-hours/m
 - **OFF-PEAK** (green): `DSK off-peak (-50%) · next peak 01:00 UTC in 42m`
 - **PEAK** (amber): `DSK peak (2× off-peak) · off-peak 10:00 UTC in 3h 12m`
 - **Weekend**: `DSK off-peak (-50%) · next peak Mon 01:00 UTC in 1d`
+
+`/deepseek-hours status` appends the current rate card, with peak prices derived (2× off-peak) in code:
+
+```
+DeepSeek PEAK (2× off-peak rate) · next off-peak 04:00 UTC in 2h · now 02:00 UTC (Mon) · Flash (per 1M tokens): off-peak $0.003 / $0.15 / $0.6 · peak $0.006 / $0.3 / $1.2
+```
 - Non-UTC schedules are labeled `local` instead of `UTC`; transitions on a later day are prefixed with the weekday.
 
 The countdown refreshes every 30 seconds; the badge only updates when its text actually changes.
@@ -54,6 +62,7 @@ The official schedule is hardcoded by default; everything is overridable for sch
 | `DEEPSEEK_PEAK_WINDOWS` | Comma-separated `HH:MM-HH:MM` peak windows in the schedule timezone | `01:00-04:00,06:00-10:00` |
 | `DEEPSEEK_UTC_OFFSET` | Hours added to UTC for the schedule timezone (e.g. `8` for Beijing) | `0` (official schedule is UTC) |
 | `DEEPSEEK_PROVIDER_IDS` | Comma-separated provider ids to match | `deepseek` |
+| `DEEPSEEK_FLASH_RATES` | Off-peak Flash unit prices, USD per 1M tokens, as `hit,miss,output` (peak prices are derived as 2× off-peak) | `0.003,0.15,0.6` |
 | `DEEPSEEK_HOURS_STATE` | Mode state file (where `/deepseek-hours mode` persists) | `~/.pi/agent/deepseek-hours/mode.json` |
 
 Example (Beijing-time schedule):
