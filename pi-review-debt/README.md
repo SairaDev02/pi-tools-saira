@@ -50,7 +50,7 @@ The tools carry prompt guidelines so the model knows when to use them: record fi
 ## Pairs well with
 
 - [`pi-review`](https://github.com/earendil-works/pi-review) — run `/review`, then the agent records findings with `record_finding`.
-- [`pi-ci-status`](https://github.com/your-org/pi-ci-status) — after addressing a finding, the agent can check CI before claiming victory.
+- [`pi-ci-status`](https://github.com/SairaDev02/pi-tools-saira/tree/main/pi-ci-status) — after addressing a finding, the agent can check CI before claiming victory.
 
 ## Development / tests
 
