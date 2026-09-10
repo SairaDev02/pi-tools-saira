@@ -1,0 +1,25 @@
+{
+  "name": "pi-verify-gate",
+  "version": "0.1.0",
+  "description": "Local verification status for the Pi coding agent: run the project's own check (npm/pnpm/yarn/bun script, cargo test, go test, pytest, make check) only when the working tree actually changed, with a zero-token footer badge, an on-demand verify_status tool, and edge-triggered one-line context injection. Zero LLM calls.",
+  "type": "module",
+  "license": "MIT",
+  "author": "SairaDev02",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "verify",
+    "test",
+    "typecheck",
+    "local-ci"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": ["./src/verify-gate.ts"]
+  },
+  "files": ["src", "tests", "README.md", "LICENSE"]
+}

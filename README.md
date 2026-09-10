@@ -8,10 +8,10 @@ A collection of MIT-licensed extensions for the [Pi coding agent](https://pi.dev
 
 ## Overview
 
-The five tools cover three everyday jobs in Pi:
+The six tools cover three everyday jobs in Pi:
 
 - **Choosing a model.** [`pi-nano-gpt-provider`](./pi-nano-gpt-provider) adds an extra provider (nanoGPT) without slowing Pi's startup; [`pi-provider-switch`](./pi-provider-switch) makes moving between providers and models fast, with tab-completions.
-- **Closing the review loop.** [`pi-review-debt`](./pi-review-debt) records code-review findings as durable per-repo debt and flags them when the code changes; [`pi-ci-status`](./pi-ci-status) is what the agent checks before claiming a fix is done.
+- **Closing the review loop.** [`pi-review-debt`](./pi-review-debt) records code-review findings as durable per-repo debt and flags them when the code changes; [`pi-verify-gate`](./pi-verify-gate) runs the project's own check on the working tree, so you know it passes before claiming the fix works; [`pi-ci-status`](./pi-ci-status) is what the agent checks before claiming a fix is done.
 - **Staying aware, at zero token cost.** [`pi-ci-status`](./pi-ci-status) and [`pi-deepseek-hours`](./pi-deepseek-hours) render footer indicators directly in the UI and make no LLM calls.
 
 Everything is deliberately small and auditable. Pick one package and read on — each ships its own README with full usage, behavior notes, and env-var reference.
@@ -23,6 +23,7 @@ Everything is deliberately small and auditable. Pick one package and read on —
 | [`pi-nano-gpt-provider`](./pi-nano-gpt-provider) | Registers the **nanoGPT** provider — lazy model discovery via `refreshModels` (no blocking at startup), per-model context windows (128k → 1M), auth via `/login` or `NANOGPT_API_KEY`. | API key for nano-gpt.com |
 | [`pi-provider-switch`](./pi-provider-switch) | `/provider`, `/switch-provider`, `/models` — interactive and argument-based provider/model switching with tab-completions and optional persistence of the default. | — |
 | [`pi-review-debt`](./pi-review-debt) | **Review-debt tracker** — records review findings as durable per-repo debt, auto-flags likely-fixed findings via git blob change detection, surfaces open debt to the model and user. | `git` |
+| [`pi-verify-gate`](./pi-verify-gate) | **Local verify gate** — runs the project's own check (`package.json` script, `cargo test`, `go test`, `pytest`, `make check`) on `agent_settled`, but only when the working tree actually changed; zero-token footer badge, `verify_status` tool, edge-triggered one-liner. Zero LLM calls. | `git` |
 | [`pi-ci-status`](./pi-ci-status) | **CI status** — zero-token footer badge, on-demand `ci_status` tool, edge-triggered one-line context injection on CI state changes. Zero LLM calls. | `gh` (authenticated), `git` |
 | [`pi-deepseek-hours`](./pi-deepseek-hours) | **DeepSeek peak/off-peak hours** — colored footer badge (or full custom footer) showing the current billing window with a live countdown to the next transition, per DeepSeek's official pricing schedule. | — |
 
@@ -40,6 +41,7 @@ cd pi-tools-saira
 cp pi-nano-gpt-provider/src/nano-gpt-provider.ts ~/.pi/agent/extensions/
 cp pi-provider-switch/src/provider-switch.ts       ~/.pi/agent/extensions/
 cp pi-review-debt/src/review-debt.ts               ~/.pi/agent/extensions/
+cp pi-verify-gate/src/verify-gate.ts               ~/.pi/agent/extensions/
 cp pi-ci-status/src/ci-status.ts                   ~/.pi/agent/extensions/
 cp pi-deepseek-hours/src/deepseek-hours.ts         ~/.pi/agent/extensions/
 ```
@@ -75,6 +77,7 @@ Each package's `src/` file is the entire extension — no build step. Type-check
 - `pi-ci-status`: **60 assertions across 4 runs** — main behavior, `gh`-missing, unauthenticated, and gate-recovery, all against a fake `gh` shim with no network.
 - `pi-deepseek-hours`: **90 assertions** — schedule parsing, weekday/weekend/offset transitions, formatting, Flash rate card, mode persistence.
 - `pi-review-debt`: **19 assertions** — the record → detect → resolve loop on a real temp git repo.
+- `pi-verify-gate`: **122 assertions** — detection order + package-manager choice, placeholder `npm init` scripts rejected, project-config trust-gating from the git root, `/verify cmd` isolation between repos, tree-key sensitivity, pass/fail/timeout/unavailable outcomes, failure-hint extraction, tail truncation, badge/run modes, config roundtrip, force vs throttled runs, pass↔fail transitions firing once, post-run key recording (a check that rewrites the tree must not re-run), inert cases, and extension wiring (the auto-run is detached and one-line injection happens exactly once).
 
 ## Contributing & support
 
@@ -82,7 +85,7 @@ Each package's `src/` file is the entire extension — no build step. Type-check
 - **Pull requests are welcome.** Before submitting:
   - Keep each extension a single file in `src/` (the `pi.extensions` manifest entry points at it — keep names in sync).
   - No build step: the `.ts` file is what ships.
-  - Run the package's tests (`node --experimental-strip-types tests/<name>.test.ts`) and keep `tsc -p tsconfig.json` clean.
+  - Run the package's tests (`node --experimental-strip-types tests/<name>.test.ts`) and keep `tsc -p tsconfig.json` clean. `pi-verify-gate` additionally needs `VERIFY_GATE_TTL_MS=0`, so its tree gate — not the TTL — is what the tests exercise.
   - Preserve the design constraints — all I/O is error-swallowed so an extension can never break the agent loop, and UI indicators make zero LLM calls.
 - **Security**: Pi extensions execute with your full system access, so review source before installing — this codebase is small and readable by design. To report a vulnerability privately, use GitHub's private vulnerability reporting on the repository (Security → *Report a vulnerability*).
 
