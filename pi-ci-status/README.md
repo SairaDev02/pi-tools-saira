@@ -75,26 +75,14 @@ The override is stored in `~/.pi/agent/ci-status/badge-mode.json` (override the 
 The core logic is exported for testing. Tests use a **fake `gh` shim** (`tests/gh-shim.mjs`) — no network, no auth:
 
 ```bash
-# happy paths (throttle, transitions, derivation)
-CI_STATUS_TTL_MS=1 CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" node --experimental-strip-types tests/ci-status.test.ts
-
-# gh-missing / unauthenticated no-op (separate processes; the gh gate is cached per process)
-CI_STATUS_GH_BIN=/nonexistent node --experimental-strip-types tests/ci-status.ghfail.test.ts
-CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" GH_SHIM_AUTH_FAIL=1 node --experimental-strip-types tests/ci-status.ghfail.test.ts
-
-# recovery: a failed gate must NOT latch — forced re-probe recovers when gh is back
-CI_STATUS_GH_BIN="$PWD/tests/gh-shim.mjs" node --experimental-strip-types tests/recover.test.ts
+npm ci
+npm test
+npm run typecheck
 ```
 
 Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops · gate-recovery after failure. **60 assertions** across the 4 runs.
 
-> The tests import the extension, so `typebox` (and `@earendil-works/pi-tui` if used) must be resolvable — e.g. run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
 
-Type-check against the real Pi types (`tsconfig.json` included):
-
-```bash
-node_modules/.bin/tsc -p tsconfig.json
-```
 
 ## Requirements
 

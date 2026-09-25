@@ -5,6 +5,18 @@
   "type": "module",
   "license": "MIT",
   "author": "SairaDev02",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SairaDev02/pi-tools-saira.git",
+    "directory": "pi-deepseek-hours"
+  },
+  "homepage": "https://github.com/SairaDev02/pi-tools-saira/tree/main/pi-deepseek-hours#readme",
+  "bugs": {
+    "url": "https://github.com/SairaDev02/pi-tools-saira/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "keywords": [
     "pi",
     "pi-coding-agent",
@@ -12,14 +24,31 @@
     "deepseek",
     "pricing",
     "off-peak",
-    "footer"
+    "footer",
+    "pi-package"
   ],
   "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@earendil-works/pi-tui": "0.87.1",
+    "@types/node": "22.19.0",
+    "typescript": "7.0.2"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types tests/deepseek-hours.test.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm test && npm run typecheck"
   },
   "pi": {
     "extensions": ["./src/deepseek-hours.ts"]
   },
-  "files": ["src", "tests", "README.md", "LICENSE"]
+  "files": ["src", "tests", "README.md", "LICENSE"],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  }
 }

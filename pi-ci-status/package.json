@@ -5,20 +5,47 @@
   "type": "module",
   "license": "MIT",
   "author": "SairaDev02",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SairaDev02/pi-tools-saira.git",
+    "directory": "pi-ci-status"
+  },
+  "homepage": "https://github.com/SairaDev02/pi-tools-saira/tree/main/pi-ci-status#readme",
+  "bugs": {
+    "url": "https://github.com/SairaDev02/pi-tools-saira/issues"
+  },
   "keywords": [
     "pi",
     "pi-coding-agent",
     "pi-extension",
     "ci",
     "github-actions",
-    "gh"
+    "gh",
+    "pi-package"
   ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
   },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@types/node": "22.19.0",
+    "typebox": "1.3.34",
+    "typescript": "7.0.2"
+  },
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm test && npm run typecheck"
+  },
   "pi": {
     "extensions": ["./src/ci-status.ts"]
   },
-  "files": ["src", "tests", "README.md", "LICENSE"]
+  "files": ["src", "tests", "README.md", "LICENSE"],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  }
 }
