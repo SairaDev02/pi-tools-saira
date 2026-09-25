@@ -11,7 +11,7 @@ Reviews are worthless if findings aren't followed up. This extension turns revie
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-review-debt
 
 # or copy the single file into your global extensions dir

@@ -2,25 +2,24 @@
 
 The six extensions are separate, unscoped public npm packages. Each package has its own pinned development dependencies, lockfile, `npm test`, `npm run typecheck`, and `prepublishOnly` checks. The allowlisted tarballs contain only the package manifest, extension source, README, license, and tests.
 
-## First publication
+## Current release: 0.1.0
 
-The initial publish must be run by an npm account authorized to claim these names. Verify each name immediately before publishing; a registry 404 means no published version was found, but does not reserve the name.
-
-From a clean, reviewed release commit, log in interactively and publish each package. `npm publish` runs that package's tests and typecheck through `prepublishOnly` before publishing:
+All six packages are published at `0.1.0`. Verify an exact version before retrying any interrupted release:
 
 ```sh
-npm login
-(cd pi-ci-status && npm ci && npm publish)
-(cd pi-deepseek-hours && npm ci && npm publish)
-(cd pi-nano-gpt-provider && npm ci && npm publish)
-(cd pi-provider-switch && npm ci && npm publish)
-(cd pi-review-debt && npm ci && npm publish)
-(cd pi-verify-gate && npm ci && npm publish)
+npm view pi-ci-status@0.1.0 version
+npm view pi-deepseek-hours@0.1.0 version
+npm view pi-nano-gpt-provider@0.1.0 version
+npm view pi-provider-switch@0.1.0 version
+npm view pi-review-debt@0.1.0 version
+npm view pi-verify-gate@0.1.0 version
 ```
 
-Do not put npm passwords, OTPs, or write tokens in the repository. These packages are unscoped, so they are public by default and do not need `--access public`. A version already published cannot be overwritten; check `npm view <name> version` if a publish is interrupted.
+The bootstrap publish required npm browser/2FA approval. If a publish returns `EOTP`, complete the browser challenge from your terminal or use `npm login --auth-type=web`, then retry only versions confirmed absent by `npm view`. Publishes are non-atomic: stop after a failure, check every package version, and never try to overwrite a published version. Do not put npm passwords, OTPs, or write tokens in the repository or chat. These unscoped packages are public by default and do not need `--access public`.
 
-The npm [trusted publisher](https://docs.npmjs.com/trusted-publishers/) setup is attached to an existing package, so bootstrap each package once with an authenticated publish. Configure a GitHub Actions trusted publisher for every resulting package at npmjs.com, using:
+## Trusted publishing for future releases
+
+The npm [trusted publisher](https://docs.npmjs.com/trusted-publishers/) setup is attached to an existing package. Configure a GitHub Actions trusted publisher for each package at npmjs.com, using:
 
 - GitHub user/organization: `SairaDev02`
 - Repository: `pi-tools-saira`
@@ -28,6 +27,8 @@ The npm [trusted publisher](https://docs.npmjs.com/trusted-publishers/) setup is
 - Allowed action: direct `npm publish` (the workflow does not use staged publishing)
 
 The package `repository.url` values match the public GitHub repository. Subsequent releases from the public repository's GitHub Actions workflow receive npm provenance automatically through OIDC; the workflow uses no long-lived npm token.
+
+Do not push a `v0.1.0` tag: all six `0.1.0` versions are already live, and the tag-triggered workflow would attempt to publish them again. Configure trusted publishing for each package before the next release.
 
 ## Subsequent releases
 

@@ -9,7 +9,7 @@ Provider and model switching commands for the [Pi coding agent](https://pi.dev):
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-provider-switch
 
 # or copy the single file into your global extensions dir

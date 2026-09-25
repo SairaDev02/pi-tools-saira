@@ -12,7 +12,7 @@ Shows whether DeepSeek API usage is currently billed at the **peak** rate or the
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-deepseek-hours
 
 # or copy the single file into your global extensions dir

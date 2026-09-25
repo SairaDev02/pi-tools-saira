@@ -11,7 +11,7 @@ Lightweight **CI status** for the [Pi coding agent](https://pi.dev): keeps you a
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-ci-status
 
 # or copy the single file into your global extensions dir

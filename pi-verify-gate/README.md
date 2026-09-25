@@ -13,7 +13,7 @@ It is the **local sibling of `pi-ci-status`**. That extension tells you what Git
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-verify-gate
 
 # or copy the single file into your global extensions dir

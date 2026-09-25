@@ -13,7 +13,7 @@ A custom **nanoGPT provider** for the [Pi coding agent](https://pi.dev). Registe
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-nano-gpt-provider
 
 # or copy the single file into your global extensions dir

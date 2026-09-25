@@ -29,9 +29,24 @@ Everything is deliberately small and auditable. Pick one package and read on —
 
 ## Install
 
-### From this repository (recommended)
+### From npm (recommended)
 
-The packages are **not published to npm yet**, so this repository is the supported way to install today. Clone it and copy the extension(s) you want into Pi's global extensions directory — `~/.pi/agent/extensions/` (on Windows: `%USERPROFILE%\.pi\agent\extensions\`) is auto-discovered by Pi:
+The six extensions are published as separate npm packages. Install any tool you want with Pi:
+
+```bash
+pi install npm:pi-nano-gpt-provider
+pi install npm:pi-provider-switch
+pi install npm:pi-review-debt
+pi install npm:pi-verify-gate
+pi install npm:pi-ci-status
+pi install npm:pi-deepseek-hours
+```
+
+Each package carries a `pi` manifest (`package.json` → `pi.extensions`). After installing, run `/reload` (or restart Pi).
+
+### From this repository
+
+For source-based installation, review or development, clone the repository and copy the extension(s) you want into Pi's global extensions directory — `~/.pi/agent/extensions/` (on Windows: `%USERPROFILE%/.pi/agent/extensions/`) is auto-discovered by Pi:
 
 ```bash
 git clone https://github.com/SairaDev02/pi-tools-saira
@@ -46,11 +61,7 @@ cp pi-ci-status/src/ci-status.ts                   ~/.pi/agent/extensions/
 cp pi-deepseek-hours/src/deepseek-hours.ts         ~/.pi/agent/extensions/
 ```
 
-After any install: `/reload` (or restart Pi). Extensions in that directory hot-reload, and updating is a matter of `git pull` + re-copying the file.
-
-### From npm (once published)
-
-Each package carries a `pi` manifest (`package.json` → `pi.extensions`), so it can be published to npm independently and installed with `pi install npm:<name>`. **Until the packages are actually published, those commands will 404** — use the repository install above instead. Once live, each package's own README shows its exact install command.
+Extensions in that directory hot-reload, and source installs can be updated with `git pull` plus re-copying the file.
 
 ## Post-install setup
 
@@ -84,7 +95,7 @@ Each package's `src/` file is the entire extension — no build step. The packag
 ## Contributing & support
 
 - **Bugs and feature requests**: open a [GitHub issue](https://github.com/SairaDev02/pi-tools-saira/issues). Please include your Pi version and, for bugs, the extension and reproduction steps.
-- **Publishing**: see [PUBLISHING.md](./PUBLISHING.md) for the initial npm bootstrap and trusted-publishing release flow.
+- **Publishing**: see [PUBLISHING.md](./PUBLISHING.md) for published versions and the trusted-publishing release flow.
 - **Pull requests are welcome.** Before submitting:
   - Keep each extension a single file in `src/` (the `pi.extensions` manifest entry points at it — keep names in sync).
   - No build step: the `.ts` file is what ships.
