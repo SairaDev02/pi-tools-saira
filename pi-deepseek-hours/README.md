@@ -12,7 +12,7 @@ Shows whether DeepSeek API usage is currently billed at the **peak** rate or the
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-deepseek-hours
 
 # or copy the single file into your global extensions dir
@@ -87,25 +87,14 @@ Invalid values are ignored with a warning — the extension falls back to the de
 - The provider is detected via `ctx.model.provider` on `model_select` / `session_start` / `agent_end` events.
 - The indicator auto-clears on `session_shutdown`.
 
-## Development
+## Development / tests
 
-- The extension is a single file — no build step.
-- One-time dev deps (resolved from the package dir; `node_modules` is gitignored):
-
-```bash
-npm i --no-save typescript @earendil-works/pi-coding-agent @earendil-works/pi-tui @earendil-works/pi-ai
-```
-
-- Run the pure schedule/format tests with plain node:
+The extension is a single file — no build step. Install the pinned development dependencies, run the suite, and type-check against the Pi types with:
 
 ```bash
-node --experimental-strip-types tests/deepseek-hours.test.ts
-```
-
-- Type-check against the real Pi types:
-
-```bash
-node_modules/.bin/tsc -p tsconfig.json
+npm ci
+npm test
+npm run typecheck
 ```
 
 ## Requirements

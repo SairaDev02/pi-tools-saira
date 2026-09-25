@@ -29,9 +29,24 @@ Everything is deliberately small and auditable. Pick one package and read on —
 
 ## Install
 
-### From this repository (recommended)
+### From npm (recommended)
 
-The packages are **not published to npm yet**, so this repository is the supported way to install today. Clone it and copy the extension(s) you want into Pi's global extensions directory — `~/.pi/agent/extensions/` (on Windows: `%USERPROFILE%\.pi\agent\extensions\`) is auto-discovered by Pi:
+The six extensions are published as separate npm packages. Install any tool you want with Pi:
+
+```bash
+pi install npm:pi-nano-gpt-provider
+pi install npm:pi-provider-switch
+pi install npm:pi-review-debt
+pi install npm:pi-verify-gate
+pi install npm:pi-ci-status
+pi install npm:pi-deepseek-hours
+```
+
+Each package carries a `pi` manifest (`package.json` → `pi.extensions`). After installing, run `/reload` (or restart Pi).
+
+### From this repository
+
+For source-based installation, review or development, clone the repository and copy the extension(s) you want into Pi's global extensions directory — `~/.pi/agent/extensions/` (on Windows: `%USERPROFILE%/.pi/agent/extensions/`) is auto-discovered by Pi:
 
 ```bash
 git clone https://github.com/SairaDev02/pi-tools-saira
@@ -46,11 +61,7 @@ cp pi-ci-status/src/ci-status.ts                   ~/.pi/agent/extensions/
 cp pi-deepseek-hours/src/deepseek-hours.ts         ~/.pi/agent/extensions/
 ```
 
-After any install: `/reload` (or restart Pi). Extensions in that directory hot-reload, and updating is a matter of `git pull` + re-copying the file.
-
-### From npm (once published)
-
-Each package carries a `pi` manifest (`package.json` → `pi.extensions`), so it can be published to npm independently and installed with `pi install npm:<name>`. **Until the packages are actually published, those commands will 404** — use the repository install above instead. Once live, each package's own README shows its exact install command.
+Extensions in that directory hot-reload, and source installs can be updated with `git pull` plus re-copying the file.
 
 ## Post-install setup
 
@@ -72,21 +83,23 @@ gh auth login
 
 ## Development
 
-Each package's `src/` file is the entire extension — no build step. Type-check against the real Pi types with `tsc --strict` (module NodeNext) using the packages Pi bundles (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `@earendil-works/pi-tui`, `typebox`). Tests are self-contained and run with plain node (`--experimental-strip-types`, Node ≥ 22.6) — see each package README for the exact commands and dev-dependency setup:
+Each package's `src/` file is the entire extension — no build step. The package pins development dependencies, provides `npm test` and `npm run typecheck`, and runs both from `prepublishOnly`. The tests use plain Node (`--experimental-strip-types`, Node ≥22.19) with local shims/temp repos and no network calls — see each package README for details:
 
 - `pi-nano-gpt-provider`: **64 assertions** — detailed catalog mapping (vision/reasoning, context/output limits, per-1k→per-million cache pricing), snapshot persistence/restore, sort selection, and every refresh failure path, all against a stubbed `fetch` with no network.
 - `pi-ci-status`: **60 assertions across 4 runs** — main behavior, `gh`-missing, unauthenticated, and gate-recovery, all against a fake `gh` shim with no network.
 - `pi-deepseek-hours`: **90 assertions** — schedule parsing, weekday/weekend/offset transitions, formatting, Flash rate card, mode persistence.
+- `pi-provider-switch`: **3 smoke checks** — all commands register and `/switch-provider` shares `/provider`'s handler.
 - `pi-review-debt`: **19 assertions** — the record → detect → resolve loop on a real temp git repo.
 - `pi-verify-gate`: **122 assertions** — detection order + package-manager choice, placeholder `npm init` scripts rejected, project-config trust-gating from the git root, `/verify cmd` isolation between repos, tree-key sensitivity, pass/fail/timeout/unavailable outcomes, failure-hint extraction, tail truncation, badge/run modes, config roundtrip, force vs throttled runs, pass↔fail transitions firing once, post-run key recording (a check that rewrites the tree must not re-run), inert cases, and extension wiring (the auto-run is detached and one-line injection happens exactly once).
 
 ## Contributing & support
 
 - **Bugs and feature requests**: open a [GitHub issue](https://github.com/SairaDev02/pi-tools-saira/issues). Please include your Pi version and, for bugs, the extension and reproduction steps.
+- **Publishing**: see [PUBLISHING.md](./PUBLISHING.md) for published versions and the trusted-publishing release flow.
 - **Pull requests are welcome.** Before submitting:
   - Keep each extension a single file in `src/` (the `pi.extensions` manifest entry points at it — keep names in sync).
   - No build step: the `.ts` file is what ships.
-  - Run the package's tests (`node --experimental-strip-types tests/<name>.test.ts`) and keep `tsc -p tsconfig.json` clean. `pi-verify-gate` additionally needs `VERIFY_GATE_TTL_MS=0`, so its tree gate — not the TTL — is what the tests exercise.
+  - Run `npm ci` and `npm run prepublishOnly` in each package before submitting. The verify-gate test runner sets `VERIFY_GATE_TTL_MS=0` so its tree gate — not the TTL — is what the tests exercise.
   - Preserve the design constraints — all I/O is error-swallowed so an extension can never break the agent loop, and UI indicators make zero LLM calls.
 - **Security**: Pi extensions execute with your full system access, so review source before installing — this codebase is small and readable by design. To report a vulnerability privately, use GitHub's private vulnerability reporting on the repository (Security → *Report a vulnerability*).
 

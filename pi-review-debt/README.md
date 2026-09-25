@@ -11,7 +11,7 @@ Reviews are worthless if findings aren't followed up. This extension turns revie
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-review-debt
 
 # or copy the single file into your global extensions dir
@@ -54,13 +54,13 @@ The tools carry prompt guidelines so the model knows when to use them: record fi
 
 ## Development / tests
 
-The core logic is exported for testing. Run the functional test suite (uses a temp state file + a real temp git repo):
+The core logic is exported for testing. The functional suite uses a temp state file and a real temp git repo. Install the pinned development dependencies, then run:
 
 ```bash
-node --experimental-strip-types tests/review-debt.test.ts
+npm ci
+npm test
+npm run typecheck
 ```
-
-> The test imports the extension, so the Pi runtime packages (`@earendil-works/pi-tui`, `typebox`) must be resolvable — e.g. run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
 
 Covers: record → unchanged stays open → file modified → auto-addressed → prefix-id resolve → dismiss → unknown-id → deleted-file detection → non-repo no-op. **19 assertions.**
 

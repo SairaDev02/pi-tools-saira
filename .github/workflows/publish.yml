@@ -1,0 +1,100 @@
+name: Publish npm packages
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify all packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Check release tag matches package versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="${GITHUB_REF_NAME#v}"
+          packages=(
+            pi-ci-status
+            pi-deepseek-hours
+            pi-nano-gpt-provider
+            pi-provider-switch
+            pi-review-debt
+            pi-verify-gate
+          )
+          for package in "${packages[@]}"; do
+            package_version="$(node -p "require('./$package/package.json').version")"
+            if [[ "$package_version" != "$release_version" ]]; then
+              echo "$package is $package_version, expected $release_version from tag $GITHUB_REF_NAME" >&2
+              exit 1
+            fi
+          done
+      - name: Install and run publish checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(
+            pi-ci-status
+            pi-deepseek-hours
+            pi-nano-gpt-provider
+            pi-provider-switch
+            pi-review-debt
+            pi-verify-gate
+          )
+          for package in "${packages[@]}"; do
+            echo "Verifying $package"
+            (
+              cd "$package"
+              npm ci
+              npm run prepublishOnly
+              npm pack --dry-run
+            )
+          done
+
+  publish:
+    name: Publish all packages
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Publish packages with npm trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(
+            pi-ci-status
+            pi-deepseek-hours
+            pi-nano-gpt-provider
+            pi-provider-switch
+            pi-review-debt
+            pi-verify-gate
+          )
+          for package in "${packages[@]}"; do
+            echo "Publishing $package"
+            (
+              cd "$package"
+              npm ci
+              npm publish
+            )
+          done

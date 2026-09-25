@@ -13,7 +13,7 @@ A custom **nanoGPT provider** for the [Pi coding agent](https://pi.dev). Registe
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-nano-gpt-provider
 
 # or copy the single file into your global extensions dir
@@ -53,12 +53,14 @@ Once installed, `nano-gpt` appears alongside your other providers:
 | `NANOGPT_API_KEY` | — | Fallback API key when no `nano-gpt` credential is stored via `/login`. |
 | `NANOGPT_MODEL_SORT` | `favorites` | Catalog ordering: `favorites`, `mostused`, or `none`/`off`. Unknown values use `favorites`. |
 
-## Tests
+## Development / tests
 
-The catalog mapping, snapshot restore, sort selection, persistence, and every refresh failure path run against a stubbed `fetch` — no Pi runtime and no network:
+The catalog mapping, snapshot restore, sort selection, persistence, and every refresh failure path run against a stubbed `fetch` — no network. Install the pinned development dependencies, then run:
 
 ```bash
-node --experimental-strip-types tests/nano-gpt-provider.test.ts
+npm ci
+npm test
+npm run typecheck
 ```
 
 ## Requirements

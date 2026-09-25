@@ -9,7 +9,7 @@ Provider and model switching commands for the [Pi coding agent](https://pi.dev):
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-provider-switch
 
 # or copy the single file into your global extensions dir
@@ -40,6 +40,16 @@ Then `/reload` (or restart).
 - **Persistence** is atomic (temp-file + rename into `settings.json`): `defaultProvider` / `defaultModel`.
 - The agent dir is `~/.pi/agent` by default; override with the `PI_CODING_AGENT_DIR` env var.
 - On a failed switch, you get a clear message: no API key for the provider (run `/login`) or the model not usable in the current scope.
+
+## Development / tests
+
+The registration smoke test checks that all three commands are exposed and `/switch-provider` shares `/provider`'s handler. Run the tests and typecheck with:
+
+```bash
+npm ci
+npm test
+npm run typecheck
+```
 
 ## Requirements
 

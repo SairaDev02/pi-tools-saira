@@ -13,7 +13,7 @@ It is the **local sibling of `pi-ci-status`**. That extension tells you what Git
 ## Install
 
 ```bash
-# from npm (after publishing)
+# install from npm
 pi install npm:pi-verify-gate
 
 # or copy the single file into your global extensions dir
@@ -110,19 +110,14 @@ The badge mode is settable via env var **and/or** `/verify badge` (which wins an
 The core logic is exported for testing. Tests use a **fake check shim** (`tests/check-shim.mjs`) — no real test suite is run:
 
 ```bash
-# TTL=0 so the tree-key gate (not the TTL) is what's under test
-VERIFY_GATE_TTL_MS=0 node --experimental-strip-types tests/verify-gate.test.ts
+npm ci
+npm test
+npm run typecheck
 ```
 
 Covers: detection order + lockfile/PM choice · placeholder `npm init` scripts rejected · project config trust-gating from the git root · `/verify cmd` isolation between repos · tree-key sensitivity (tracked, new untracked, untracked content) · pass/fail/timeout/unavailable outcomes · failure-hint extraction (`SyntaxError`/`TypeError`/`Traceback`/`error[E]`/`error TS`, and quiet on clean output) · output-tail truncation · badge/line/signature derivation · badge + run modes · config roundtrip · force vs throttled runs · pass→fail and fail→pass transitions fire once · **post-run key recording** (a check that rewrites the tree must not re-run) · `no-check`/`no-repo` inert cases · extension wiring (`session_start` does no spawn, the auto-run is detached from the event path, `agent_settled` sets the badge, auto-run `off`, one-line injection happens **exactly once**) · tool + `/verify` command surface.
 
-Type-check against the real Pi types (`tsconfig.json` included):
 
-```bash
-node_modules/.bin/tsc -p tsconfig.json
-```
-
-> The tests import the extension, so `typebox` (and `@earendil-works/pi-tui` if used) must be resolvable — run from an environment where Pi's runtime node_modules are reachable, or symlink/junction them into a local `node_modules` first.
 
 ## Requirements
 
