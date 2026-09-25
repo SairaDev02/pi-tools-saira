@@ -3,3 +3,5 @@ node_modules/
 *.tmp
 .DS_Store
 .vscode
+# Local Pi runtime state
+.atl/
