@@ -20,7 +20,7 @@ Everything is deliberately small and auditable. Pick one package and read on —
 
 | Package | What it does | Requires |
 |---------|--------------|----------|
-| [`pi-nano-gpt-provider`](./pi-nano-gpt-provider) | Registers the **nanoGPT** provider — lazy model discovery via `refreshModels` (no blocking at startup), per-model context windows (128k → 1M), auth via `/login` or `NANOGPT_API_KEY`. | API key for nano-gpt.com |
+| [`pi-nano-gpt-provider`](./pi-nano-gpt-provider) | Registers the **nanoGPT** provider — lazy discovery of the detailed model catalog (`?detailed=true`: context windows, output caps, vision/reasoning flags, at-cost pricing), persisted snapshot usable offline, no startup blocking. Auth via `/login` or `NANOGPT_API_KEY`. | API key for nano-gpt.com |
 | [`pi-provider-switch`](./pi-provider-switch) | `/provider`, `/switch-provider`, `/models` — interactive and argument-based provider/model switching with tab-completions and optional persistence of the default. | — |
 | [`pi-review-debt`](./pi-review-debt) | **Review-debt tracker** — records review findings as durable per-repo debt, auto-flags likely-fixed findings via git blob change detection, surfaces open debt to the model and user. | `git` |
 | [`pi-verify-gate`](./pi-verify-gate) | **Local verify gate** — runs the project's own check (`package.json` script, `cargo test`, `go test`, `pytest`, `make check`) on `agent_settled`, but only when the working tree actually changed; zero-token footer badge, `verify_status` tool, edge-triggered one-liner. Zero LLM calls. | `git` |
@@ -74,6 +74,7 @@ gh auth login
 
 Each package's `src/` file is the entire extension — no build step. Type-check against the real Pi types with `tsc --strict` (module NodeNext) using the packages Pi bundles (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `@earendil-works/pi-tui`, `typebox`). Tests are self-contained and run with plain node (`--experimental-strip-types`, Node ≥ 22.6) — see each package README for the exact commands and dev-dependency setup:
 
+- `pi-nano-gpt-provider`: **64 assertions** — detailed catalog mapping (vision/reasoning, context/output limits, per-1k→per-million cache pricing), snapshot persistence/restore, sort selection, and every refresh failure path, all against a stubbed `fetch` with no network.
 - `pi-ci-status`: **60 assertions across 4 runs** — main behavior, `gh`-missing, unauthenticated, and gate-recovery, all against a fake `gh` shim with no network.
 - `pi-deepseek-hours`: **90 assertions** — schedule parsing, weekday/weekend/offset transitions, formatting, Flash rate card, mode persistence.
 - `pi-review-debt`: **19 assertions** — the record → detect → resolve loop on a real temp git repo.
