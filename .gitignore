@@ -5,3 +5,6 @@ node_modules/
 .vscode
 # Local Pi runtime state
 .atl/
+# Understand Anything analysis data and local dashboard notes
+.ua/
+DASHBOARD.md
