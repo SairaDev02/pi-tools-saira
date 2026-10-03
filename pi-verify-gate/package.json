@@ -1,6 +1,6 @@
 {
   "name": "pi-verify-gate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local verification status for the Pi coding agent: run the project's own check (npm/pnpm/yarn/bun script, cargo test, go test, pytest, make check) only when the working tree actually changed, with a zero-token footer badge, an on-demand verify_status tool, and edge-triggered one-line context injection. Zero LLM calls.",
   "type": "module",
   "license": "MIT",
@@ -43,9 +43,16 @@
     "prepublishOnly": "npm test && npm run typecheck"
   },
   "pi": {
-    "extensions": ["./src/verify-gate.ts"]
+    "extensions": [
+      "./src/verify-gate.ts"
+    ]
   },
-  "files": ["src", "tests", "README.md", "LICENSE"],
+  "files": [
+    "src",
+    "tests",
+    "README.md",
+    "LICENSE"
+  ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   }
