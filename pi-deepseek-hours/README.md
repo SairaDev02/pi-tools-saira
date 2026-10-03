@@ -29,14 +29,14 @@ The indicator appears in the footer **only while a DeepSeek model is the active 
 | --- | --- |
 | `/deepseek-hours` | Toggle the badge on/off (persisted) |
 | `/deepseek-hours badge` | Colored status in the built-in footer (default) |
-| `/deepseek-hours full` | Replace the footer with a custom component: token usage, model, branch, other extension statuses, plus the DeepSeek window |
+| `/deepseek-hours full` | **Deprecated** alias for `badge`; the built-in footer already shows other extensions' statuses next to the badge |
 | `/deepseek-hours off` | No indicator |
 | `/deepseek-hours status` | Print the current window state as plain text, plus the Flash rate card (e.g. for a quick check or to share with the model) |
 | `/deepseek-hours mode` | Show the current mode (`persisted` or `default`) |
 | `/deepseek-hours mode badge\|full\|off` | Set the mode **and persist it** across restarts |
 | `/deepseek-hours mode reset` | Back to the default (`badge`), clears persistence |
 
-The mode set via any command above is persisted to `~/.pi/agent/deepseek-hours/mode.json` and re-applied on the next session start (`/reload` included), so a `full`-footer preference survives restarts.
+The mode set via any command above is persisted to `~/.pi/agent/deepseek-hours/mode.json` and re-applied on the next session start (`/reload` included), so the choice survives restarts. `full` is still accepted and a persisted `full` still loads, but it always renders as `badge` (selecting it keeps writing `full` to the state file). The badge appears in the built-in footer — including Pi 1.0's fullscreen footer dock — alongside other extensions' statuses, so the old custom-footer mode is no longer needed.
 
 ### What it shows
 
@@ -82,7 +82,6 @@ Invalid values are ignored with a warning — the extension falls back to the de
 ## How it works
 
 - `ctx.ui.setStatus("deepseek-hours", ...)` renders the colored badge inside the built-in footer (ANSI colors are honored).
-- `/deepseek-hours full` uses `ctx.ui.setFooter(...)` with a component mirroring the built-in footer (cwd/branch line, token stats + model, and other extensions' statuses so the `ci` badge etc. stay visible).
 - A 30-second timer recomputes the state; renders only happen when the displayed text changes.
 - The provider is detected via `ctx.model.provider` on `model_select` / `session_start` / `agent_end` events.
 - The indicator auto-clears on `session_shutdown`.
@@ -99,7 +98,7 @@ npm run typecheck
 
 ## Requirements
 
-- Pi coding agent (extension API)
+- Pi coding agent (extension API; tested against 1.0.0)
 
 ## License
 

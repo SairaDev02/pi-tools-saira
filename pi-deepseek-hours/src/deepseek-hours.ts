@@ -18,11 +18,11 @@
  *
  * Modes (toggle with /deepseek-hours, persisted across restarts):
  *   badge  (default)  colored status item in the built-in footer
- *   full               replaces the footer with a custom component that also
- *                      shows token usage, model, branch and other extension
- *                      statuses (so the ci badge etc. stay visible)
  *   off                no indicator
  *   status             print the current window state as plain text
+ *   full               DEPRECATED alias for "badge" (kept for persisted
+ *                      state and habit; the built-in footer already shows
+ *                      other extensions' statuses next to the badge)
  *
  * The indicator is only shown while a DeepSeek model is the active provider
  * (provider id "deepseek" — override with DEEPSEEK_PROVIDER_IDS).
@@ -49,15 +49,11 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
 	ExtensionContext,
-	ReadonlyFooterDataProvider,
-	Theme,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 // ---------------------------------------------------------------------------
 // Schedule facts (official, as of the pricing page above)
@@ -356,11 +352,19 @@ export function statusText(
 
 const BADGE_KEY = "deepseek-hours";
 const TICK_MS = 30_000;
-const MIN_PAD = 2;
 
+/** Persisted/requested mode; `full` is a deprecated alias for `badge`. */
 type Mode = "badge" | "full" | "off";
 
-/** Agent dir (override with PI_CODING_AGENT_DIR), matching pi-provider-switch. */
+/** The mode actually rendered: `full` resolves to `badge`. */
+export type ActiveMode = "badge" | "off";
+
+/** Resolve a requested mode to the one that renders (`full` -> `badge`). */
+export function resolveMode(mode: Mode): ActiveMode {
+	return mode === "full" ? "badge" : mode;
+}
+
+/** Agent dir (override with PI_CODING_AGENT_DIR), matching Pi's global layout. */
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 /** Mode state file (override with DEEPSEEK_HOURS_STATE for tests). */
 const MODE_STATE_FILE = process.env.DEEPSEEK_HOURS_STATE ?? join(AGENT_DIR, "deepseek-hours", "mode.json");
@@ -411,8 +415,6 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 	let currentCtx: ExtensionContext | undefined;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let lastBadge = ""; // only call setStatus when the text actually changes
-	let footerTui: { requestRender(): void } | undefined;
-	let lastFullKey = "";
 
 	function windowState(now: Date): WindowState {
 		return currentState(cfg, now);
@@ -446,28 +448,8 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	/** Sync the full footer (mode "full") — re-render only when content changed. */
-	function refreshFull(): void {
-		if (!footerTui) return;
-		const provider = currentCtx?.model?.provider;
-		const state = windowState(new Date());
-		const key = JSON.stringify([
-			currentCtx?.model?.id,
-			currentCtx?.model?.provider,
-			isDeepseek(provider) ? badgeText(state, cfg, new Date()) : "",
-		]);
-		if (key === lastFullKey) return;
-		lastFullKey = key;
-		try {
-			footerTui.requestRender();
-		} catch {
-			/* ignore */
-		}
-	}
-
 	function tick(): void {
-		if (mode === "badge") refreshBadge();
-		else if (mode === "full") refreshFull();
+		if (mode !== "off") refreshBadge();
 	}
 
 	function startTimer(): void {
@@ -482,130 +464,30 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	// --- footer component (mode "full") ------------------------------------
-
-	function setFullFooter(): void {
-		const ctx = currentCtx;
-		if (!ctx?.hasUI) return;
-		ctx.ui.setFooter((tui, theme, footerData) => {
-			footerTui = tui;
-			lastFullKey = "";
-			return {
-				invalidate() {},
-				dispose() {
-					if (footerTui === tui) footerTui = undefined;
-				},
-				render(width: number): string[] {
-					return renderFullFooter(theme, footerData, width);
-				},
-			};
-		});
-	}
-
-	function renderFullFooter(theme: Theme, footerData: ReadonlyFooterDataProvider, width: number): string[] {
-		const ctx = currentCtx;
-		const model = ctx?.model;
-		const lines: string[] = [];
-
-		// Line 1: cwd + branch + session name (dim).
-		let pwd = ctx?.cwd ? formatCwd(ctx.cwd) : "";
-		const branch = footerData.getGitBranch();
-		if (branch) pwd = pwd ? `${pwd} (${branch})` : branch;
-		const sessionName = ctx?.sessionManager.getSessionName();
-		if (sessionName) pwd = pwd ? `${pwd} • ${sessionName}` : sessionName;
-		lines.push(truncateToWidth(theme.fg("dim", pwd || "(no cwd)"), width, theme.fg("dim", "...")));
-
-		// Line 2: token stats left, model + DeepSeek window right.
-		let input = 0,
-			output = 0,
-			cost = 0;
-		for (const e of ctx?.sessionManager.getBranch() ?? []) {
-			if (e.type === "message" && e.message.role === "assistant") {
-				const m = e.message as AssistantMessage;
-				input += m.usage.input;
-				output += m.usage.output;
-				cost += m.usage.cost.total;
-			}
-		}
-		const fmt = (n: number) => (n < 1000 ? `${n}` : `${(n / 1000).toFixed(1)}k`);
-		const statsParts: string[] = [];
-		if (input) statsParts.push(`↑${fmt(input)}`);
-		if (output) statsParts.push(`↓${fmt(output)}`);
-		if (cost || input || output) statsParts.push(`$${cost.toFixed(3)}`);
-		const ctxUsage = ctx?.getContextUsage();
-		if (ctxUsage && ctxUsage.tokens !== null && model) {
-			const pct = Math.round((ctxUsage.tokens / ctxUsage.contextWindow) * 100);
-			statsParts.push(`${pct}%/${fmt(ctxUsage.contextWindow)}`);
-		}
-		const statsLeft = theme.fg("dim", statsParts.join(" ") || "∅");
-
-		let rightSide = "";
-		if (model) {
-			const label = footerData.getAvailableProviderCount() > 1 ? `(${model.provider}) ${model.id}` : model.id;
-			rightSide = theme.fg("dim", label);
-		}
-		if (isDeepseek(model?.provider)) {
-			const state = windowState(new Date());
-			const color = state.peak ? "warning" : "success";
-			rightSide += ` ${theme.fg(color, badgeText(state, cfg, new Date()))}`;
-		}
-
-		const statsLeftWidth = visibleWidth(statsLeft);
-		const rightWidth = visibleWidth(rightSide);
-		const pad = " ".repeat(Math.max(MIN_PAD, width - statsLeftWidth - rightWidth));
-		lines.push(truncateToWidth(statsLeft + pad + rightSide, width));
-
-		// Line 3: other extension statuses (ci badge etc.), sorted by key.
-		const statuses = footerData.getExtensionStatuses();
-		if (statuses.size > 0) {
-			const sorted = Array.from(statuses.entries())
-				.sort(([a], [b]) => a.localeCompare(b))
-				.map(([, t]) => sanitizeStatus(t));
-			lines.push(truncateToWidth(sorted.join(" "), width, theme.fg("dim", "...")));
-		}
-		return lines;
-	}
-
-	function formatCwd(cwd: string): string {
-		const home = homedir();
-		return cwd === home ? "~" : cwd.startsWith(home + "\\") || cwd.startsWith(home + "/") ? `~${cwd.slice(home.length)}` : cwd;
-	}
-
-	function sanitizeStatus(text: string): string {
-		return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
-	}
-
 	// --- mode switching ------------------------------------------------------
 
 	function applyMode(next: Mode, ctx: ExtensionCommandContext, notify: boolean): void {
 		mode = next;
-		if (mode !== "full") {
-			// Restore the built-in footer if we replaced it.
-			try {
-				ctx.ui.setFooter(undefined);
-			} catch {
-				/* ignore */
-			}
-			footerTui = undefined;
-			lastFullKey = "";
-		}
-		if (mode !== "badge") {
+		// `full` is a deprecated alias for `badge`: the built-in footer already
+		// shows other extensions' statuses next to the badge.
+		const active = resolveMode(mode);
+		if (active === "off") {
 			try {
 				ctx.ui.setStatus(BADGE_KEY, undefined);
 			} catch {
 				/* ignore */
 			}
 			lastBadge = "";
+		} else {
+			refreshBadge();
 		}
-		if (mode === "full") setFullFooter();
-		else refreshBadge();
 		if (notify) {
 			const msg =
-				mode === "badge"
-					? "DeepSeek hours: badge mode (built-in footer)"
+				active === "off"
+					? "DeepSeek hours: indicator off"
 					: mode === "full"
-						? "DeepSeek hours: full footer mode"
-						: "DeepSeek hours: indicator off";
+						? "DeepSeek hours: full footer mode is deprecated — using the badge (built-in footer)"
+						: "DeepSeek hours: badge mode (built-in footer)";
 			try {
 				ctx.ui.notify(msg, "info");
 			} catch {
@@ -649,7 +531,8 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 				const sub = arg === "mode" ? "" : arg.slice(5).trim();
 				if (sub === "") {
 					const origin = loadPersistedMode(MODE_STATE_FILE) !== null ? "persisted" : "default";
-					notify(ctx, `DeepSeek hours mode: ${mode} (${origin})`, "info");
+					const shown = mode === "full" ? "badge (full deprecated)" : mode;
+					notify(ctx, `DeepSeek hours mode: ${shown} (${origin})`, "info");
 					return;
 				}
 				if (sub === "badge" || sub === "full" || sub === "off") {
@@ -691,8 +574,6 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", (_event, ctx) => {
 		currentCtx = ctx;
-		// Re-apply the persisted mode (e.g. full footer after a restart).
-		if (mode === "full") setFullFooter();
 		startTimer();
 		tick();
 	});
@@ -704,14 +585,6 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 
 	pi.on("agent_end", (_event, ctx) => {
 		currentCtx = ctx;
-		// Token stats changed — re-render the full footer if in full mode.
-		if (mode === "full" && footerTui) {
-			try {
-				footerTui.requestRender();
-			} catch {
-				/* ignore */
-			}
-		}
 		tick();
 	});
 
@@ -720,12 +593,9 @@ export default function deepseekHoursExtension(pi: ExtensionAPI): void {
 		currentCtx = undefined;
 		try {
 			ctx.ui.setStatus(BADGE_KEY, undefined);
-			ctx.ui.setFooter(undefined);
 		} catch {
 			/* ignore */
 		}
-		footerTui = undefined;
 		lastBadge = "";
-		lastFullKey = "";
 	});
 }

@@ -80,6 +80,7 @@ console.log("\n== detailed record mapping ==");
 	check("max output from catalog", mapped?.maxTokens === 128_000);
 	check("vision -> image input", JSON.stringify(mapped?.input) === '["text","image"]');
 	check("reasoning flag false", mapped?.reasoning === false);
+	check("chat discriminator set", mapped?.type === "chat");
 	check("input price per million", mapped?.cost.input === 2);
 	check("output price per million", mapped?.cost.output === 10);
 	check("cache read per-1k scaled to per-million", mapped?.cost.cacheRead === 0.2);
@@ -148,6 +149,7 @@ console.log("\n== snapshot restore ==");
 	check("stored fields preserved", restored[0].id === "anthropic/claude-sonnet-5" && restored[0].contextWindow === 1_000_000);
 	check("stored metadata stripped", !("baseUrl" in restored[0]) && !("provider" in restored[0]) && !("api" in restored[0]));
 	check("stored input preserved", JSON.stringify(restored[0].input) === '["text","image"]');
+	check("restored entries are chat", restored[0].type === "chat");
 	check("minimal stored entry gets defaults", restored[1].contextWindow === 128_000 && restored[1].maxTokens === 8192);
 	check("undefined stored -> empty", modelsFromStored(undefined).length === 0);
 }
@@ -290,7 +292,8 @@ let successModels: any[] = [];
 		"persisted models carry store metadata",
 		published[0].persist.models[0].provider === "nano-gpt" &&
 			published[0].persist.models[0].api === "openai-completions" &&
-			published[0].persist.models[0].baseUrl === BASE,
+			published[0].persist.models[0].baseUrl === BASE &&
+			published[0].persist.models[0].type === "chat",
 	);
 	check("no stale metadata on returned models", successModels[0].provider === undefined && successModels[0].baseUrl === undefined);
 }

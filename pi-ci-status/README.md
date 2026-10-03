@@ -80,13 +80,13 @@ npm test
 npm run typecheck
 ```
 
-Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops · gate-recovery after failure. **60 assertions** across the 4 runs.
+Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-commit refetch · green→red transition fires once · red→active · no re-fire on same signature · badge/line/format derivation · badge visibility modes (`CI_STATUS_BADGE`: always/activity/off) · badge-mode override persistence (`/ci badge`) · gh-missing and unauthenticated no-ops · gate-recovery after failure · extension-registration wiring (tool, command, handlers). **78 assertions** across the 5 runs.
 
 
 
 ## Requirements
 
-- Pi coding agent (extension API)
+- Pi coding agent (extension API; tested against 1.0.0)
 - GitHub CLI (`gh`) installed and authenticated
 - `git` on PATH
 

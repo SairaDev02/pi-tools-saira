@@ -36,6 +36,13 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
 /** Fallback when the detailed record omits `max_output_tokens`. */
 const DEFAULT_MAX_TOKENS = 8192;
 
+/**
+ * A chat entry. Pi 1.0.0 types `ProviderModelConfig` as a chat/image/classifier
+ * union; this provider's catalog is chat-only, so every entry carries the
+ * explicit discriminator (Pi still defaults an omitted `type` to `"chat"`).
+ */
+export type NanoGptModelConfig = ProviderModelConfig & { type: "chat" };
+
 /** Supported `sort` values from the models endpoint documentation, plus `none`. */
 type ModelSort = "favorites" | "mostused" | "none";
 
@@ -131,7 +138,7 @@ function inputModalities(raw: NanoGptRawModel): ("text" | "image")[] {
  * `capabilities.reasoning` is the authoritative flag; the `:thinking` id suffix
  * is also treated as reasoning because a few variant ids ship without the flag.
  */
-export function mapNanoGptModel(raw: NanoGptRawModel): ProviderModelConfig | undefined {
+export function mapNanoGptModel(raw: NanoGptRawModel): NanoGptModelConfig | undefined {
 	if (typeof raw.id !== "string" || raw.id.length === 0) return undefined;
 
 	const pricing = raw.pricing ?? {};
@@ -140,6 +147,7 @@ export function mapNanoGptModel(raw: NanoGptRawModel): ProviderModelConfig | und
 	const contextWindow = positiveNumber(raw.context_length) ?? DEFAULT_CONTEXT_WINDOW;
 
 	return {
+		type: "chat",
 		id: raw.id,
 		name: typeof raw.name === "string" && raw.name.length > 0 ? raw.name : raw.id,
 		reasoning: raw.capabilities?.reasoning === true || raw.id.toLowerCase().endsWith(":thinking"),
@@ -181,15 +189,16 @@ function storedInput(value: unknown): ("text" | "image")[] {
  * from an extension model are kept, so stored `api`/`baseUrl` values can never
  * override a future host change.
  */
-export function modelsFromStored(models: readonly StoredModelLike[] | undefined): ProviderModelConfig[] {
+export function modelsFromStored(models: readonly StoredModelLike[] | undefined): NanoGptModelConfig[] {
 	if (!models) return [];
-	const restored: ProviderModelConfig[] = [];
+	const restored: NanoGptModelConfig[] = [];
 	for (const model of models) {
 		if (typeof model.id !== "string" || model.id.length === 0) continue;
 		const rates = model.cost ?? {};
 		const input = nonNegativeNumber(rates.input) ?? 0;
 		const contextWindow = positiveNumber(model.contextWindow) ?? DEFAULT_CONTEXT_WINDOW;
 		restored.push({
+			type: "chat",
 			id: model.id,
 			name: typeof model.name === "string" && model.name.length > 0 ? model.name : model.id,
 			reasoning: model.reasoning === true,
@@ -208,7 +217,7 @@ export function modelsFromStored(models: readonly StoredModelLike[] | undefined)
 }
 
 /** A persisted model carries the full pi `Model` shape expected by the store. */
-type PersistedModel = ProviderModelConfig & {
+type PersistedModel = NanoGptModelConfig & {
 	provider: string;
 	api: "openai-completions";
 	baseUrl: string;
@@ -218,7 +227,7 @@ type PersistedModel = ProviderModelConfig & {
  * Models store entries are typed as pi `Model`s, so the persisted snapshot gets
  * the provider/api/baseUrl fields. They are stripped again on restore.
  */
-function withProviderMetadata(models: ProviderModelConfig[]): PersistedModel[] {
+function withProviderMetadata(models: NanoGptModelConfig[]): PersistedModel[] {
 	return models.map((model) => ({
 		...model,
 		provider: "nano-gpt",
@@ -230,7 +239,7 @@ function withProviderMetadata(models: ProviderModelConfig[]): PersistedModel[] {
 export default function (pi: ExtensionAPI) {
 	// Last successfully discovered catalog. Re-published when a later refresh
 	// fails, so a transient error never empties the model list.
-	let lastKnown: ProviderModelConfig[] = [];
+	let lastKnown: NanoGptModelConfig[] = [];
 
 	pi.registerProvider("nano-gpt", {
 		name: "nanoGPT",
@@ -271,7 +280,7 @@ export default function (pi: ExtensionAPI) {
 
 				const models = records
 					.map((record) => mapNanoGptModel(record as NanoGptRawModel))
-					.filter((model): model is ProviderModelConfig => model !== undefined);
+					.filter((model): model is NanoGptModelConfig => model !== undefined);
 
 				// An empty catalog is treated as a bad response, not as "no models":
 				// the endpoint always returns the visible text catalog.

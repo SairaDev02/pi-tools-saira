@@ -1,7 +1,7 @@
 {
   "name": "pi-deepseek-hours",
   "version": "0.1.0",
-  "description": "DeepSeek peak/off-peak hours footer indicator for the Pi coding agent: colored badge (or full custom footer) showing the current billing window with a live countdown to the next transition, per DeepSeek's official pricing schedule.",
+  "description": "DeepSeek peak/off-peak hours footer indicator for the Pi coding agent: colored badge showing the current billing window with a live countdown to the next transition, per DeepSeek's official pricing schedule.",
   "type": "module",
   "license": "MIT",
   "author": "SairaDev02",
@@ -28,19 +28,15 @@
     "pi-package"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.87.1",
-    "@earendil-works/pi-coding-agent": "0.87.1",
-    "@earendil-works/pi-tui": "0.87.1",
+    "@earendil-works/pi-coding-agent": "1.0.0",
     "@types/node": "22.19.0",
     "typescript": "7.0.2"
   },
   "scripts": {
-    "test": "node --experimental-strip-types tests/deepseek-hours.test.ts",
+    "test": "node --experimental-strip-types tests/run.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "prepublishOnly": "npm test && npm run typecheck"
   },

@@ -62,7 +62,7 @@ npm test
 npm run typecheck
 ```
 
-Covers: record → unchanged stays open → file modified → auto-addressed → prefix-id resolve → dismiss → unknown-id → deleted-file detection → non-repo no-op. **19 assertions.**
+Covers: record → unchanged stays open → file modified → auto-addressed → prefix-id resolve → dismiss → unknown-id → deleted-file detection → non-repo no-op, plus extension-registration wiring (tools, command, handlers, no-op injection). **41 assertions across 2 runs.**
 
 ## Requirements
 

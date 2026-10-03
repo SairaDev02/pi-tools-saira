@@ -25,6 +25,7 @@ import {
 	loadProviderIds,
 	parseFlashRates,
 	parseWindows,
+	resolveMode,
 	savePersistedMode,
 	statusText,
 	type FlashRates,
@@ -346,6 +347,13 @@ check("loadPersistedMode: badge", loadPersistedMode(stateFile) === "badge");
 await fs.writeFile(stateFile, JSON.stringify({ mode: "sometimes" }), "utf8");
 check("loadPersistedMode: invalid -> null", loadPersistedMode(stateFile) === null);
 await fs.rm(stateDir, { recursive: true, force: true });
+
+// --- 9. deprecated full mode ------------------------------------------------
+console.log("\n== resolveMode (full deprecated) ==");
+
+check("resolveMode: badge -> badge", resolveMode("badge") === "badge");
+check("resolveMode: off -> off", resolveMode("off") === "off");
+check("resolveMode: full -> badge (deprecated alias)", resolveMode("full") === "badge");
 
 // -----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);

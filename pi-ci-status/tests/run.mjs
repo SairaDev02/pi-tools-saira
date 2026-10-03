@@ -12,6 +12,7 @@ const cases = [
   ["ci-status.ghfail.test.ts", { CI_STATUS_GH_BIN: missingGh }],
   ["ci-status.ghfail.test.ts", { CI_STATUS_GH_BIN: ghShim, GH_SHIM_AUTH_FAIL: "1" }],
   ["recover.test.ts", { CI_STATUS_GH_BIN: ghShim }],
+  ["registration.test.ts", { CI_STATUS_GH_BIN: ghShim }],
 ];
 
 for (const [file, env] of cases) {
