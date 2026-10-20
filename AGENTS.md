@@ -1,6 +1,6 @@
 # pi-tools-saira
 
-Five self-contained Pi extensions, each published as its own npm package from this one repo. There is no root workspace and no shared build: every change lives inside one `pi-*/` package. Vocabulary is defined in `CONTEXT.md`; each package's `README.md` documents its own usage, env vars, and tests.
+Five self-contained Pi extensions, each published as its own npm package from this one repo. There is no root workspace and no shared build: every change lives inside one `pi-*/` package. Vocabulary is defined in `GLOSSARY.md`; each package's `README.md` documents its own usage, env vars, and tests.
 
 ## Work in one package
 
