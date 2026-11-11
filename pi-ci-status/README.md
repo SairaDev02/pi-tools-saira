@@ -86,7 +86,7 @@ Covers: gate ok · initial fetch · HEAD-unchanged skip (no extra spawn) · new-
 
 ## Requirements
 
-- Pi coding agent (extension API; tested against 1.0.0)
+- Pi coding agent (extension API)
 - GitHub CLI (`gh`) installed and authenticated
 - `git` on PATH
 

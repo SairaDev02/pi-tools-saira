@@ -98,7 +98,7 @@ npm run typecheck
 
 ## Requirements
 
-- Pi coding agent (extension API; tested against 1.0.0)
+- Pi coding agent (extension API)
 
 ## License
 
