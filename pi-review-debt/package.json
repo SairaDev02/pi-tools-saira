@@ -1,6 +1,6 @@
 {
   "name": "pi-review-debt",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Review-debt tracker for the Pi coding agent: records code-review findings as durable per-repo debt, auto-detects likely-fixed findings via git blob change detection, and surfaces open debt to the model and the user.",
   "type": "module",
   "license": "MIT",

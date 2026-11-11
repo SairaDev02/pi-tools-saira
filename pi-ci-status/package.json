@@ -1,6 +1,6 @@
 {
   "name": "pi-ci-status",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Lightweight CI status for the Pi coding agent: zero-token footer badge, on-demand ci_status tool, and edge-triggered one-line context injection on CI state changes. Zero LLM calls.",
   "type": "module",
   "license": "MIT",

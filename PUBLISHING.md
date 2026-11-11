@@ -2,16 +2,16 @@
 
 The five extensions are separate, unscoped public npm packages. Each package has its own pinned development dependencies, lockfile, `npm test`, `npm run typecheck`, and `prepublishOnly` checks. The allowlisted tarballs contain only the package manifest, extension source, README, license, and tests.
 
-## Current release: 0.2.0
+## Current release: 0.2.1
 
-All five packages are published at `0.2.0`. Verify an exact version before retrying any interrupted release:
+All five packages are published at `0.2.1`. Verify an exact version before retrying any interrupted release:
 
 ```sh
-npm view pi-ci-status@0.2.0 version
-npm view pi-deepseek-hours@0.2.0 version
-npm view pi-nano-gpt-provider@0.2.0 version
-npm view pi-review-debt@0.2.0 version
-npm view pi-verify-gate@0.2.0 version
+npm view pi-ci-status@0.2.1 version
+npm view pi-deepseek-hours@0.2.1 version
+npm view pi-nano-gpt-provider@0.2.1 version
+npm view pi-review-debt@0.2.1 version
+npm view pi-verify-gate@0.2.1 version
 ```
 
 Publishes are non-atomic: stop after a failure, check every package version, and never try to overwrite a published version. Do not put npm passwords, OTPs, or write tokens in the repository or chat. These unscoped packages are public by default and do not need `--access public`.
